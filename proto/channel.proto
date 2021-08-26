@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package weni.ai.whatsapp_router;
+option go_package = "./pb";
+
+message ChannelRequest {
+  string uuid = 1;
+  string name = 2;
+}
+
+message ChannelResponse {
+  string token = 1;
+}
+
+service ChannelService {
+  rpc CreateChannel (ChannelRequest) returns (ChannelResponse) {};
+}
