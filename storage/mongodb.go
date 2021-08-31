@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -16,15 +17,19 @@ func NewDB() *mongo.Database {
 	//TODO move to env config
 	uri := "mongodb://admin:admin@127.0.0.1:27017/?appName=whatsapp-router"
 	options := options.Client().ApplyURI(uri)
-	connection, err := mongo.Connect(context.TODO(), options)
+	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer ctxCancel()
+	connection, err := mongo.Connect(ctx, options)
 	if err != nil {
-		panic(err)
+		log.Println("mongodb FAIL")
+		panic(err.Error())
 	}
 
 	if err := connection.Ping(context.TODO(), readpref.Primary()); err != nil {
-		panic(err)
+		log.Println("mongodb FAIL")
+		panic(err.Error())
 	} else {
-		fmt.Println("Successfully connected and pinged on mongodb.")
+		fmt.Println("mongodb OK")
 	}
 
 	db := connection.Database(dbName)

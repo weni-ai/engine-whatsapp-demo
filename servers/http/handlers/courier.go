@@ -39,8 +39,8 @@ func PostToWhatsapp(body []byte) {
 	res, err := httpClient.Do(req)
 
 	if err != nil {
-		fmt.Println("error")
-		log.Fatal(err)
+		log.Println(err.Error())
 	}
-	fmt.Println(res)
+
+	fmt.Println(res.Status)
 }

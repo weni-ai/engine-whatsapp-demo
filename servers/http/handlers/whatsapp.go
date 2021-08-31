@@ -21,12 +21,13 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 	incomingMsg := MessagePayload{}
 
 	if err := json.NewDecoder(r.Body).Decode(&incomingMsg); err != nil {
-		log.Print(err)
+		log.Print("unexpected server error - " + err.Error())
 		return
 	}
 
 	incomingContact := incomingMsg.ToContact()
 	if incomingContact == nil {
+		log.Println("bad request for logical error")
 		return
 	}
 
@@ -39,18 +40,12 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 		channelId := contact.Channel.Hex()
 		channel, err2 := h.ChannelService.FindChannelById(channelId)
 		if err2 != nil {
-			log.Print(err)
+			log.Println(err.Error())
 		}
 		if channel != nil {
-			//TODO redirect message to channel handler
 			jsonMsg, _ := json.Marshal(incomingMsg)
-
-			// channelUUID := "624476b1-032f-46d8-becd-d0f14e23bfbb"
 			channelUUID := channel.UUID
-
 			RedirectRequest(r, channelUUID, string(jsonMsg))
-		} else {
-			//TODO nothing to do
 		}
 
 	} else {
@@ -75,14 +70,16 @@ func RedirectRequest(r *http.Request, channelUUID string, msg string) {
 		fmt.Sprintf("%v/%v/receive", courierBaseURL, channelUUID),
 		"application/json",
 		bytes.NewBuffer([]byte(msg)))
+
 	if err != nil {
-		fmt.Printf("err %s", err)
+		fmt.Println(err.Error())
 		return
 	}
+
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Print(err)
+		log.Print(err.Error())
 		return
 	}
 	fmt.Printf("Body: %s", body)

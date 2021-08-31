@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"context"
+	"errors"
 
 	"github.com/weni/whatsapp-router/models"
 	"go.mongodb.org/mongo-driver/bson"
@@ -23,7 +24,7 @@ type ContactRepositoryDb struct {
 func (c ContactRepositoryDb) Insert(contact *models.Contact) (*models.Contact, error) {
 	result, err := c.DB.Collection(CONTACT_COLLECTION).InsertOne(context.TODO(), contact)
 	if err != nil {
-		return nil, err
+		return nil, errors.New("unexpected database error - " + err.Error())
 	}
 
 	if id, ok := result.InsertedID.(primitive.ObjectID); ok {
@@ -39,7 +40,7 @@ func (c ContactRepositoryDb) FindOne(contact *models.Contact) (*models.Contact, 
 		"urn": contact.URN,
 	}
 	if err := c.DB.Collection(CONTACT_COLLECTION).FindOne(context.TODO(), qry).Decode(&cont); err != nil {
-		return nil, err
+		return nil, errors.New("contact not found")
 	}
 	return &cont, nil
 }
