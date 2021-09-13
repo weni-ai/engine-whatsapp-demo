@@ -6,6 +6,7 @@ import (
 	"net"
 
 	"github.com/weni/whatsapp-router/config"
+	"github.com/weni/whatsapp-router/logger"
 	"github.com/weni/whatsapp-router/servers/grpc/grpc_servers"
 	"github.com/weni/whatsapp-router/servers/grpc/pb"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -36,18 +37,20 @@ func (s *Server) Start() error {
 	address := fmt.Sprintf("0.0.0.0:%d", s.config.Server.GRPCPort)
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
-		log.Fatal(err)
+		logger.Error(err.Error())
+		log.Fatal()
 		return err
 	}
 
-	log.Printf("Start grpc server :%v", s.config.Server.GRPCPort)
+	logger.Info(fmt.Sprintf("Start grpc server :%v", s.config.Server.GRPCPort))
 
 	// s.WaitGroup.Add(1)
 	go func() {
 		// defer s.WaitGroup.Done()
 		err = s.grpcServer.Serve(listener)
 		if err != nil {
-			log.Fatal(err)
+			logger.Error(err.Error())
+			log.Fatal()
 		}
 	}()
 

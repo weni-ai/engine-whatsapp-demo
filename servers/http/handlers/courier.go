@@ -2,20 +2,19 @@ package handlers
 
 import (
 	"bytes"
-	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/url"
 
 	"github.com/weni/whatsapp-router/config"
+	"github.com/weni/whatsapp-router/logger"
 )
 
 func HandleSendMessage(w http.ResponseWriter, r *http.Request) {
 	bodyBytes, _ := ioutil.ReadAll(r.Body)
 	bodyString := string(bodyBytes)
 
-	log.Print(bodyString)
+	logger.Info(bodyString)
 	PostToWhatsapp(bodyBytes)
 }
 
@@ -39,8 +38,8 @@ func PostToWhatsapp(body []byte) {
 	res, err := httpClient.Do(req)
 
 	if err != nil {
-		log.Println(err.Error())
+		logger.Error(err.Error())
 	}
 
-	fmt.Println(res.Status)
+	logger.Debug(res.Status)
 }

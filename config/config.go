@@ -6,6 +6,7 @@ import (
 
 	"github.com/joeshaw/envdecode"
 	"github.com/joho/godotenv"
+	"github.com/weni/whatsapp-router/logger"
 )
 
 type Config struct {
@@ -42,11 +43,12 @@ func GetConfig() *Config {
 		fmt.Println("Config is nil")
 		AppConf = &Config{}
 		if err := godotenv.Load("./config/.env"); err != nil {
-			log.Print("Error loading .env file")
+			logger.Error("Error loading .env file")
 		}
 
 		if err := envdecode.StrictDecode(AppConf); err != nil {
-			log.Fatalf("Failed to decode and load environment variables: %v", err)
+			logger.Error(fmt.Sprintf("Failed to decode and load environment variables: %v", err))
+			log.Fatal()
 		}
 	}
 	return AppConf
