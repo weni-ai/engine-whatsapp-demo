@@ -6,17 +6,16 @@ import (
 	"log"
 	"time"
 
+	"github.com/weni/whatsapp-router/config"
 	"github.com/weni/whatsapp-router/logger"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
-var dbName = "whatsapp-router"
-
 func NewDB() *mongo.Database {
-	//TODO move to env config
-	uri := "mongodb://admin:admin@127.0.0.1:27017/?appName=whatsapp-router"
+	dbConf := config.GetConfig().DB
+	uri := fmt.Sprintf("mongodb://%s:%s@%s:%v/?appName=whatsapp-router", dbConf.User, dbConf.Password, dbConf.Host, dbConf.Port)
 	options := options.Client().ApplyURI(uri)
 	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer ctxCancel()
@@ -33,7 +32,7 @@ func NewDB() *mongo.Database {
 		logger.Info("mongodb OK")
 	}
 
-	db := connection.Database(dbName)
+	db := connection.Database(dbConf.Name)
 	return db
 }
 
