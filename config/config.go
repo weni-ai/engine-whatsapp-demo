@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/joeshaw/envdecode"
 	"github.com/joho/godotenv"
@@ -41,10 +42,14 @@ var AppConf *Config
 
 func GetConfig() *Config {
 	if AppConf == nil {
-		logger.Info("loading env config")
+		logger.Info("loading config")
 		AppConf = &Config{}
-		if err := godotenv.Load("./config/.env"); err != nil {
-			logger.Error("Error loading .env file")
+
+		_, hasEnvVars := os.LookupEnv("DB_HOST")
+		if !hasEnvVars {
+			if err := godotenv.Load("./config/.env"); err != nil {
+				logger.Error("Error loading .env file")
+			}
 		}
 
 		if err := envdecode.StrictDecode(AppConf); err != nil {
