@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/weni/whatsapp-router/config"
 	"github.com/weni/whatsapp-router/logger"
@@ -65,8 +67,9 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 
 func RedirectRequest(r *http.Request, channelUUID string, msg string) {
 	courierBaseURL := config.GetConfig().Server.CourierBaseURL
+	url := fmt.Sprintf("%v/%v/receive", courierBaseURL, channelUUID)
 	resp, err := http.Post(
-		fmt.Sprintf("%v/%v/receive", courierBaseURL, channelUUID),
+		url,
 		"application/json",
 		bytes.NewBuffer([]byte(msg)))
 
@@ -81,7 +84,52 @@ func RedirectRequest(r *http.Request, channelUUID string, msg string) {
 		logger.Error(err.Error())
 		return
 	}
-	logger.Debug(fmt.Sprintf("SENT: %v", body))
+	logger.Info(fmt.Sprintf("SENT: %v", string(body)))
+}
+
+func RefreshToken(w http.ResponseWriter, r *http.Request) {
+	wconfig := config.GetConfig().Whatsapp
+	httpClient := &http.Client{}
+	reqPath := "/v1/users/login"
+
+	reqURL, _ := url.Parse(wconfig.BaseURL + reqPath)
+
+	req := &http.Request{
+		Method: "POST",
+		URL:    reqURL,
+		Header: map[string][]string{},
+		Body:   r.Body,
+	}
+
+	req.SetBasicAuth(config.AppConf.Whatsapp.Username, config.AppConf.Whatsapp.Password)
+
+	res, err := httpClient.Do(req)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprint(w, err.Error())
+		logger.Error(err.Error())
+		return
+	}
+
+	var login LoginPayload
+
+	if err := json.NewDecoder(res.Body).Decode(&login); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprint(w, err.Error())
+		logger.Error(err.Error())
+		return
+	}
+
+	newToken := login.Users[0].Token
+
+	config.UpdateToken(newToken)
+	logger.Info("Whatsapp token update")
+	w.WriteHeader(http.StatusOK)
+	b, _ := json.Marshal(login)
+	for k, v := range res.Header {
+		w.Header().Set(k, strings.Join(v, ""))
+	}
+	fmt.Fprint(w, string(b))
 }
 
 type MessagePayload struct {
@@ -100,6 +148,17 @@ type MessagePayload struct {
 		Timestamp string `json:"timestamp"`
 		Type      string `json:"type"`
 	} `json:"messages"`
+}
+
+type LoginPayload struct {
+	Users []struct {
+		Token        string
+		ExpiresAfter string
+	}
+	Meta struct {
+		Version   string
+		ApiStatus string
+	}
 }
 
 func (m *MessagePayload) ToContact() *models.Contact {
