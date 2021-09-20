@@ -3,10 +3,10 @@ package grpc_servers
 import (
 	"context"
 
-	"github.com/teris-io/shortid"
 	"github.com/weni/whatsapp-router/models"
 	"github.com/weni/whatsapp-router/repositories"
 	"github.com/weni/whatsapp-router/servers/grpc/pb"
+	"github.com/weni/whatsapp-router/utils"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -22,7 +22,7 @@ func (c *ChannelServer) CreateChannel(ctx context.Context, req *pb.ChannelReques
 	var channel models.Channel
 	channel.UUID = req.GetUuid()
 	channel.Name = req.GetName()
-	token, _ := shortid.Generate()
+	token := utils.GenToken(channel.Name)
 
 	channel.Token = token
 
