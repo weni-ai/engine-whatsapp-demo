@@ -38,9 +38,7 @@ func (s *Server) Start() error {
 		WriteTimeout: 30 * time.Second,
 	}
 
-	// s.WaitGroup.Add(1)
 	go func() {
-		// defer s.WaitGroup.Done()
 		logger.Info(fmt.Sprintf("Starting http server :%v", s.config.Server.HttpPort))
 		err := s.httpServer.ListenAndServe()
 		if err != nil && err != http.ErrServerClosed {
