@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 
+	"github.com/weni/whatsapp-router/config"
 	"github.com/weni/whatsapp-router/logger"
 	"github.com/weni/whatsapp-router/models"
 	"github.com/weni/whatsapp-router/services"
@@ -62,17 +63,15 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 	}
 }
 
-const courierBaseURL = "https://f3e9-179-235-152-98.ngrok.io/c/wa"
-
-//TODO finish this
 func RedirectRequest(r *http.Request, channelUUID string, msg string) {
+	courierBaseURL := config.GetConfig().Server.CourierBaseURL
 	resp, err := http.Post(
 		fmt.Sprintf("%v/%v/receive", courierBaseURL, channelUUID),
 		"application/json",
 		bytes.NewBuffer([]byte(msg)))
 
 	if err != nil {
-		fmt.Println(err.Error())
+		logger.Error(err.Error())
 		return
 	}
 
@@ -82,7 +81,7 @@ func RedirectRequest(r *http.Request, channelUUID string, msg string) {
 		logger.Error(err.Error())
 		return
 	}
-	fmt.Printf("Body: %s", body)
+	logger.Debug(fmt.Sprintf("SENT: %v", body))
 }
 
 type MessagePayload struct {

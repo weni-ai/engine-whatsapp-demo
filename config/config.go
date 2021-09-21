@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/joeshaw/envdecode"
 	"github.com/joho/godotenv"
@@ -16,8 +17,9 @@ type Config struct {
 }
 
 type ServerConfig struct {
-	HttpPort int32 `env:"SERVER_HTTP_PORT,required"`
-	GRPCPort int32 `env:"SERVER_GRPC_PORT,required"`
+	HttpPort       int32  `env:"SERVER_HTTP_PORT,required"`
+	GRPCPort       int32  `env:"SERVER_GRPC_PORT,required"`
+	CourierBaseURL string `env:"SERVER_COURIER_BASE_URL"`
 }
 
 type DbConfig struct {
@@ -40,10 +42,14 @@ var AppConf *Config
 
 func GetConfig() *Config {
 	if AppConf == nil {
-		fmt.Println("Config is nil")
+		logger.Info("loading config")
 		AppConf = &Config{}
-		if err := godotenv.Load("./config/.env"); err != nil {
-			logger.Error("Error loading .env file")
+
+		_, hasEnvVars := os.LookupEnv("DB_HOST")
+		if !hasEnvVars {
+			if err := godotenv.Load("./config/.env"); err != nil {
+				logger.Error("Error loading .env file")
+			}
 		}
 
 		if err := envdecode.StrictDecode(AppConf); err != nil {

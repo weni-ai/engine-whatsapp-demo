@@ -16,7 +16,7 @@ var tcInsertChannel = []struct {
 	{
 		TestName: "Insert Channel",
 		Channel: models.Channel{
-			UUID:  "asdfgh",
+			UUID:  "f11c744c-4937-4ee3-8a51-26e56eb77c4e",
 			Name:  "foo",
 			Token: "foo-bar-zaz",
 		},
