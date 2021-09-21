@@ -6,6 +6,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/weni/whatsapp-router/logger"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
@@ -21,15 +22,15 @@ func NewDB() *mongo.Database {
 	defer ctxCancel()
 	connection, err := mongo.Connect(ctx, options)
 	if err != nil {
-		log.Println("mongodb FAIL")
+		logger.Error("mongodb FAIL")
 		panic(err.Error())
 	}
 
 	if err := connection.Ping(context.TODO(), readpref.Primary()); err != nil {
-		log.Println("mongodb FAIL")
+		logger.Error("mongodb FAIL")
 		panic(err.Error())
 	} else {
-		fmt.Println("mongodb OK")
+		logger.Info("mongodb OK")
 	}
 
 	db := connection.Database(dbName)
@@ -38,6 +39,8 @@ func NewDB() *mongo.Database {
 
 func CloseDB(db *mongo.Database) {
 	if err := db.Client().Disconnect(context.TODO()); err != nil {
-		log.Fatalf("Error on close MongoDB: %v", err)
+		logger.Error(fmt.Sprintf("Error on close MongoDB: %v", err))
+		log.Fatal()
+
 	}
 }

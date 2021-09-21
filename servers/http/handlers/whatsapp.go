@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 
+	"github.com/weni/whatsapp-router/logger"
 	"github.com/weni/whatsapp-router/models"
 	"github.com/weni/whatsapp-router/services"
 )
@@ -21,26 +21,26 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 	incomingMsg := MessagePayload{}
 
 	if err := json.NewDecoder(r.Body).Decode(&incomingMsg); err != nil {
-		log.Print("unexpected server error - " + err.Error())
+		logger.Error("unexpected server error - " + err.Error())
 		return
 	}
 
 	incomingContact := incomingMsg.ToContact()
 	if incomingContact == nil {
-		log.Println("bad request for logical error")
+		logger.Error("bad request for logical error")
 		return
 	}
 
 	contact, err := h.ContactService.FindContact(incomingContact)
 	if err != nil {
-		log.Print(err)
+		logger.Error(err.Error())
 	}
 
 	if contact != nil {
 		channelId := contact.Channel.Hex()
 		channel, err2 := h.ChannelService.FindChannelById(channelId)
 		if err2 != nil {
-			log.Println(err.Error())
+			logger.Error(err.Error())
 		}
 		if channel != nil {
 			jsonMsg, _ := json.Marshal(incomingMsg)
@@ -52,7 +52,7 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 		possibleToken := incomingMsg.Messages[0].Text.Body
 		ch, err := h.ChannelService.FindChannelByToken(possibleToken)
 		if err != nil {
-			log.Print(err)
+			logger.Error(err.Error())
 		}
 		if ch != nil {
 			incomingContact.Channel = ch.ID
@@ -79,7 +79,7 @@ func RedirectRequest(r *http.Request, channelUUID string, msg string) {
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Print(err.Error())
+		logger.Error(err.Error())
 		return
 	}
 	fmt.Printf("Body: %s", body)

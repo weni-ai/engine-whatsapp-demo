@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"testing"
 
-	uuid "github.com/satori/go.uuid"
 	"github.com/weni/whatsapp-router/models"
 	"github.com/weni/whatsapp-router/storage"
 )
@@ -17,7 +16,7 @@ var tcInsertChannel = []struct {
 	{
 		TestName: "Insert Channel",
 		Channel: models.Channel{
-			UUID:  uuid.NewV4().String(),
+			UUID:  "asdfgh",
 			Name:  "foo",
 			Token: "foo-bar-zaz",
 		},

@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/weni/whatsapp-router/config"
+	"github.com/weni/whatsapp-router/logger"
 	"github.com/weni/whatsapp-router/repositories"
 	"github.com/weni/whatsapp-router/servers/http/handlers"
 	"github.com/weni/whatsapp-router/services"
@@ -40,10 +41,11 @@ func (s *Server) Start() error {
 	// s.WaitGroup.Add(1)
 	go func() {
 		// defer s.WaitGroup.Done()
-		log.Printf("Starting http server :%v", s.config.Server.HttpPort)
+		logger.Info(fmt.Sprintf("Starting http server :%v", s.config.Server.HttpPort))
 		err := s.httpServer.ListenAndServe()
 		if err != nil && err != http.ErrServerClosed {
-			log.Fatal(err)
+			logger.Error(err.Error())
+			log.Fatal()
 		}
 	}()
 
