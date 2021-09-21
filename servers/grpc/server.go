@@ -44,9 +44,7 @@ func (s *Server) Start() error {
 
 	logger.Info(fmt.Sprintf("Start grpc server :%v", s.config.Server.GRPCPort))
 
-	// s.WaitGroup.Add(1)
 	go func() {
-		// defer s.WaitGroup.Done()
 		err = s.grpcServer.Serve(listener)
 		if err != nil {
 			logger.Error(err.Error())
