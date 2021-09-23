@@ -69,6 +69,7 @@ func NewRouter(s *Server) *chi.Mux {
 
 	router.Route("/v1", func(r chi.Router) {
 		r.Post("/messages", handlers.HandleSendMessage)
+		r.Post("/users/login", handlers.RefreshToken)
 	})
 
 	return router

@@ -48,14 +48,18 @@ func GetConfig() *Config {
 		_, hasEnvVars := os.LookupEnv("DB_HOST")
 		if !hasEnvVars {
 			if err := godotenv.Load("./config/.env"); err != nil {
-				logger.Error("Error loading .env file")
+				logger.Error(fmt.Sprintf("Error loading .env file: %v", err.Error()))
 			}
 		}
 
 		if err := envdecode.StrictDecode(AppConf); err != nil {
-			logger.Error(fmt.Sprintf("Failed to decode and load environment variables: %v", err))
+			logger.Error(fmt.Sprintf("Failed to decode and load environment variables: %v", err.Error()))
 			log.Fatal()
 		}
 	}
 	return AppConf
+}
+
+func UpdateToken(token string) {
+	AppConf.Whatsapp.AuthToken = token
 }
