@@ -60,7 +60,7 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 		if ch != nil {
 			incomingContact.Channel = ch.ID
 			h.ContactService.CreateContact(incomingContact)
-
+			sendConfirmationMessage(incomingContact)
 		}
 	}
 }
@@ -130,6 +130,41 @@ func RefreshToken(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set(k, strings.Join(v, ""))
 	}
 	fmt.Fprint(w, string(b))
+}
+
+func sendConfirmationMessage(contact *models.Contact) {
+	message := "Token válido, Whatsapp demo está pronto para sua utilização"
+	urn := contact.URN
+	payload := fmt.Sprintf(
+		`{"to":"%s","type":"text","text":{"body":"%s"}}`,
+		urn,
+		message,
+	)
+	payloadBytes := []byte(payload)
+
+	wconfig := config.GetConfig().Whatsapp
+
+	httpClient := &http.Client{}
+	reqPath := "/v1/messages"
+
+	reqURL, _ := url.Parse(wconfig.BaseURL + reqPath)
+	req := &http.Request{
+		Method: "POST",
+		URL:    reqURL,
+		Header: map[string][]string{
+			"Content-Type":  {"application/json; charset=UTF-8"},
+			"Authorization": {"Bearer " + wconfig.AuthToken},
+		},
+		Body: ioutil.NopCloser(bytes.NewReader(payloadBytes)),
+	}
+
+	res, err := httpClient.Do(req)
+	if err != nil {
+		logger.Error(err.Error())
+	} else {
+		body, _ := ioutil.ReadAll(res.Body)
+		logger.Info(string(body))
+	}
 }
 
 type MessagePayload struct {
