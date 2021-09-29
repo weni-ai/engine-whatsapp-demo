@@ -18,17 +18,19 @@ import (
 type WhatsappHandler struct {
 	ContactService services.ContactService
 	ChannelService services.ChannelService
+	CourierService services.CourierService
 }
 
 func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.Request) {
-	incomingMsg := MessagePayload{}
-
-	if err := json.NewDecoder(r.Body).Decode(&incomingMsg); err != nil {
+	incomingMsg, err := ioutil.ReadAll(r.Body)
+	if err != nil {
 		logger.Error("unexpected server error - " + err.Error())
+		w.WriteHeader(http.StatusNotAcceptable)
+		fmt.Fprint(w, err.Error())
 		return
 	}
 
-	incomingContact := incomingMsg.ToContact()
+	incomingContact := incomingMsgToContact(string(incomingMsg))
 	if incomingContact == nil {
 		logger.Error("bad request for logical error")
 		return
@@ -46,9 +48,14 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 			logger.Error(err.Error())
 		}
 		if channel != nil {
-			jsonMsg, _ := json.Marshal(incomingMsg)
 			channelUUID := channel.UUID
-			RedirectRequest(r, channelUUID, string(jsonMsg))
+			// RedirectRequest(channelUUID, string(jsonMsg))
+			status, err := h.CourierService.RedirectMessage(channelUUID, string(incomingMsg))
+			if err != nil {
+				logger.Error(err.Error())
+				w.WriteHeader(status)
+				fmt.Fprint(w, err)
+			}
 		}
 
 	} else {
@@ -65,7 +72,7 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 	}
 }
 
-func RedirectRequest(r *http.Request, channelUUID string, msg string) {
+func RedirectRequest(channelUUID string, msg string) {
 	courierBaseURL := config.GetConfig().Server.CourierBaseURL
 	url := fmt.Sprintf("%v/%v/receive", courierBaseURL, channelUUID)
 	resp, err := http.Post(
@@ -167,24 +174,6 @@ func sendConfirmationMessage(contact *models.Contact) {
 	}
 }
 
-type MessagePayload struct {
-	Contacts []struct {
-		Profile struct {
-			Name string `json:"name"`
-		} `json:"profile"`
-		WaID string `json:"wa_id"`
-	} `json:"contacts"`
-	Messages []struct {
-		From string `json:"from"`
-		ID   string `json:"id"`
-		Text struct {
-			Body string `json:"body"`
-		} `json:"text"`
-		Timestamp string `json:"timestamp"`
-		Type      string `json:"type"`
-	} `json:"messages"`
-}
-
 type LoginPayload struct {
 	Users []struct {
 		Token        string
@@ -196,12 +185,36 @@ type LoginPayload struct {
 	}
 }
 
-func (m *MessagePayload) ToContact() *models.Contact {
-	if len(m.Messages) > 0 && len(m.Contacts) > 0 {
+func incomingMsgToContact(m string) *models.Contact {
+	name := extractName(m)
+	number := extractNumber(m)
+	if name != nil && number != nil {
 		return &models.Contact{
-			URN:  m.Messages[0].From,
-			Name: m.Contacts[0].Profile.Name,
+			URN:  *number,
+			Name: *name,
 		}
 	}
 	return nil
+}
+
+func extractName(m string) *string {
+	var result map[string][]map[string]map[string]interface{}
+	json.Unmarshal([]byte(m), &result)
+	if result["contacts"] != nil {
+		return result["contacts"][0]["profile"]["name"].(*string)
+	}
+	return nil
+}
+
+func extractNumber(m string) *string {
+	var result map[string][]map[string]interface{}
+	json.Unmarshal([]byte(m), &result)
+	if result["messages"] != nil {
+		return result["messages"][0]["from"].(*string)
+	}
+	return nil
+}
+
+func extractText() *string {
+
 }
