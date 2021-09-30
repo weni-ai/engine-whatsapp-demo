@@ -60,6 +60,9 @@ func NewRouter(s *Server) *chi.Mux {
 		ChannelService: services.NewChannelService(channelRepoDb),
 		CourierService: services.NewCourierService(),
 	}
+	courierHandler := handlers.CourierHandler{
+		WhatsappService: services.NewWhatsappService(),
+	}
 
 	router.Route("/wr/", func(r chi.Router) {
 		r.Use(ContentTypeJson)
@@ -69,7 +72,7 @@ func NewRouter(s *Server) *chi.Mux {
 	})
 
 	router.Route("/v1", func(r chi.Router) {
-		r.Post("/messages", handlers.HandleSendMessage)
+		r.Post("/messages", courierHandler.HandleSendMessage)
 		r.Post("/users/login", handlers.RefreshToken)
 	})
 
