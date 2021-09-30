@@ -58,6 +58,7 @@ func NewRouter(s *Server) *chi.Mux {
 	whatsappHandler := handlers.WhatsappHandler{
 		ContactService: services.NewContactService(contactRepoDb),
 		ChannelService: services.NewChannelService(channelRepoDb),
+		CourierService: services.NewCourierService(),
 	}
 
 	router.Route("/wr/", func(r chi.Router) {
