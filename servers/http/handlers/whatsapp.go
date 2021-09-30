@@ -3,6 +3,7 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -25,73 +26,61 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 	incomingMsg, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		logger.Error("unexpected server error - " + err.Error())
-		w.WriteHeader(http.StatusNotAcceptable)
+		w.WriteHeader(http.StatusOK)
 		fmt.Fprint(w, err.Error())
 		return
 	}
 
 	incomingContact := incomingMsgToContact(string(incomingMsg))
 	if incomingContact == nil {
-		logger.Error("bad request for logical error")
+		err := errors.New("request without being from a contact")
+		logger.Debug(fmt.Sprintf("%v: %v", err.Error(), string(incomingMsg)))
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, err.Error())
 		return
 	}
 
 	contact, err := h.ContactService.FindContact(incomingContact)
 	if err != nil {
-		logger.Error(err.Error())
+		logger.Debug(err.Error())
 	}
 
 	if contact != nil {
 		channelId := contact.Channel.Hex()
-		channel, err2 := h.ChannelService.FindChannelById(channelId)
-		if err2 != nil {
-			logger.Error(err.Error())
+		channel, err := h.ChannelService.FindChannelById(channelId)
+		if err != nil {
+			logger.Debug(err.Error())
 		}
 		if channel != nil {
 			channelUUID := channel.UUID
 			// RedirectRequest(channelUUID, string(jsonMsg))
 			status, err := h.CourierService.RedirectMessage(channelUUID, string(incomingMsg))
 			if err != nil {
-				logger.Error(err.Error())
+				logger.Debug(err.Error())
 				w.WriteHeader(status)
 				fmt.Fprint(w, err)
 			}
 		}
 
 	} else {
-		possibleToken := incomingMsg.Messages[0].Text.Body
-		ch, err := h.ChannelService.FindChannelByToken(possibleToken)
-		if err != nil {
-			logger.Error(err.Error())
+		if possibleToken := extractTextMessage(string(incomingMsg)); possibleToken != "" {
+			ch, err := h.ChannelService.FindChannelByToken(possibleToken)
+			if err != nil {
+				logger.Error(err.Error())
+			}
+			if ch != nil {
+				incomingContact.Channel = ch.ID
+				h.ContactService.CreateContact(incomingContact)
+				//TODO refactor this to use wpp service
+				sendConfirmationMessage(incomingContact)
+				w.WriteHeader(http.StatusCreated)
+				fmt.Fprint(w, "")
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprint(w, errors.New("contact not found and token not valid"))
 		}
-		if ch != nil {
-			incomingContact.Channel = ch.ID
-			h.ContactService.CreateContact(incomingContact)
-			sendConfirmationMessage(incomingContact)
-		}
 	}
-}
-
-func RedirectRequest(channelUUID string, msg string) {
-	courierBaseURL := config.GetConfig().Server.CourierBaseURL
-	url := fmt.Sprintf("%v/%v/receive", courierBaseURL, channelUUID)
-	resp, err := http.Post(
-		url,
-		"application/json",
-		bytes.NewBuffer([]byte(msg)))
-
-	if err != nil {
-		logger.Error(err.Error())
-		return
-	}
-
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		logger.Error(err.Error())
-		return
-	}
-	logger.Info(fmt.Sprintf("SENT: %v", string(body)))
 }
 
 func RefreshToken(w http.ResponseWriter, r *http.Request) {
@@ -126,7 +115,7 @@ func RefreshToken(w http.ResponseWriter, r *http.Request) {
 		logger.Error(err.Error())
 		return
 	}
-
+	//TODO refactor this to reduce code and simplify
 	newToken := login.Users[0].Token
 
 	config.UpdateToken(newToken)
@@ -188,33 +177,38 @@ type LoginPayload struct {
 func incomingMsgToContact(m string) *models.Contact {
 	name := extractName(m)
 	number := extractNumber(m)
-	if name != nil && number != nil {
+	if name != "" && number != "" {
 		return &models.Contact{
-			URN:  *number,
-			Name: *name,
+			URN:  number,
+			Name: name,
 		}
 	}
 	return nil
 }
 
-func extractName(m string) *string {
+func extractName(m string) string {
 	var result map[string][]map[string]map[string]interface{}
 	json.Unmarshal([]byte(m), &result)
 	if result["contacts"] != nil {
-		return result["contacts"][0]["profile"]["name"].(*string)
+		return result["contacts"][0]["profile"]["name"].(string)
 	}
-	return nil
+	return ""
 }
 
-func extractNumber(m string) *string {
+func extractNumber(m string) string {
 	var result map[string][]map[string]interface{}
 	json.Unmarshal([]byte(m), &result)
 	if result["messages"] != nil {
-		return result["messages"][0]["from"].(*string)
+		return result["messages"][0]["from"].(string)
 	}
-	return nil
+	return ""
 }
 
-func extractText() *string {
-
+func extractTextMessage(m string) string {
+	var result map[string][]map[string]map[string]interface{}
+	json.Unmarshal([]byte(m), &result)
+	if result["messages"] != nil {
+		return result["messages"][0]["text"]["body"].(string)
+	}
+	return ""
 }
