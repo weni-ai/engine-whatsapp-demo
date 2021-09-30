@@ -3,11 +3,9 @@ package services
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 
 	"github.com/weni/whatsapp-router/config"
-	"github.com/weni/whatsapp-router/logger"
 )
 
 type CourierService interface {
@@ -29,11 +27,9 @@ func (cs DefaultCourierService) RedirectMessage(channelUUID string, msg string) 
 		return resp.StatusCode, err
 	}
 
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return http.StatusInternalServerError, err
-	}
-	logger.Info(fmt.Sprintf("SENT: %v", string(body)))
-	return http.StatusCreated, nil
+	return resp.StatusCode, nil
+}
+
+func NewCourierService() DefaultCourierService {
+	return DefaultCourierService{}
 }
