@@ -15,7 +15,7 @@ import (
 
 func NewDB() *mongo.Database {
 	dbConf := config.GetConfig().DB
-	uri := fmt.Sprintf("mongodb://%s:%s@%s:%v/?appName=whatsapp-router", dbConf.User, dbConf.Password, dbConf.Host, dbConf.Port)
+	uri := fmt.Sprintf("mongodb+srv://%s:%s@%s:%v/?appName=whatsapp-router", dbConf.User, dbConf.Password, dbConf.Host, dbConf.Port)
 	options := options.Client().ApplyURI(uri)
 	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer ctxCancel()
