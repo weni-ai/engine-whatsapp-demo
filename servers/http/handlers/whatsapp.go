@@ -1,10 +1,10 @@
 package handlers
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -16,10 +16,13 @@ import (
 	"github.com/weni/whatsapp-router/services"
 )
 
+const confirmationMessage = "Token válido, Whatsapp demo está pronto para sua utilização"
+
 type WhatsappHandler struct {
-	ContactService services.ContactService
-	ChannelService services.ChannelService
-	CourierService services.CourierService
+	ContactService  services.ContactService
+	ChannelService  services.ChannelService
+	CourierService  services.CourierService
+	WhatsappService services.WhatsappService
 }
 
 func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.Request) {
@@ -31,7 +34,7 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 		return
 	}
 
-	incomingContact := incomingMsgToContact(string(incomingMsg))
+	incomingContact := parseToContact(string(incomingMsg))
 	if incomingContact == nil {
 		err := errors.New("request without being from a contact")
 		logger.Debug(fmt.Sprintf("%v: %v", err.Error(), string(incomingMsg)))
@@ -71,15 +74,21 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 			if ch != nil {
 				incomingContact.Channel = ch.ID
 				h.ContactService.CreateContact(incomingContact)
-				//TODO refactor this to use wpp service
-				sendConfirmationMessage(incomingContact)
-				w.WriteHeader(http.StatusCreated)
-				fmt.Fprint(w, "")
+				_, b, err := h.sendTokenConfirmation(incomingContact)
+				if err != nil {
+					logger.Error(err.Error())
+					w.WriteHeader(http.StatusInternalServerError)
+				} else {
+					body, _ := ioutil.ReadAll(b)
+					logger.Info(string(body))
+					w.WriteHeader(http.StatusCreated)
+				}
+				fmt.Fprint(w, b)
 				return
 			}
-			w.WriteHeader(http.StatusOK)
-			fmt.Fprint(w, errors.New("contact not found and token not valid"))
 		}
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, errors.New("contact not found and token not valid"))
 	}
 }
 
@@ -107,7 +116,16 @@ func RefreshToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var login LoginPayload
+	var login struct {
+		Users []struct {
+			Token        string
+			ExpiresAfter string
+		}
+		Meta struct {
+			Version   string
+			ApiStatus string
+		}
+	}
 
 	if err := json.NewDecoder(res.Body).Decode(&login); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -115,7 +133,7 @@ func RefreshToken(w http.ResponseWriter, r *http.Request) {
 		logger.Error(err.Error())
 		return
 	}
-	//TODO refactor this to reduce code and simplify
+
 	newToken := login.Users[0].Token
 
 	config.UpdateToken(newToken)
@@ -128,53 +146,19 @@ func RefreshToken(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, string(b))
 }
 
-func sendConfirmationMessage(contact *models.Contact) {
-	message := "Token válido, Whatsapp demo está pronto para sua utilização"
+func (h *WhatsappHandler) sendTokenConfirmation(contact *models.Contact) (http.Header, io.ReadCloser, error) {
 	urn := contact.URN
 	payload := fmt.Sprintf(
 		`{"to":"%s","type":"text","text":{"body":"%s"}}`,
 		urn,
-		message,
+		confirmationMessage,
 	)
 	payloadBytes := []byte(payload)
 
-	wconfig := config.GetConfig().Whatsapp
-
-	httpClient := &http.Client{}
-	reqPath := "/v1/messages"
-
-	reqURL, _ := url.Parse(wconfig.BaseURL + reqPath)
-	req := &http.Request{
-		Method: "POST",
-		URL:    reqURL,
-		Header: map[string][]string{
-			"Content-Type":  {"application/json; charset=UTF-8"},
-			"Authorization": {"Bearer " + wconfig.AuthToken},
-		},
-		Body: ioutil.NopCloser(bytes.NewReader(payloadBytes)),
-	}
-
-	res, err := httpClient.Do(req)
-	if err != nil {
-		logger.Error(err.Error())
-	} else {
-		body, _ := ioutil.ReadAll(res.Body)
-		logger.Info(string(body))
-	}
+	return h.WhatsappService.SendMessage(payloadBytes)
 }
 
-type LoginPayload struct {
-	Users []struct {
-		Token        string
-		ExpiresAfter string
-	}
-	Meta struct {
-		Version   string
-		ApiStatus string
-	}
-}
-
-func incomingMsgToContact(m string) *models.Contact {
+func parseToContact(m string) *models.Contact {
 	name := extractName(m)
 	number := extractNumber(m)
 	if name != "" && number != "" {
