@@ -1,7 +1,10 @@
 package handlers
 
 import (
+	"bytes"
 	"errors"
+	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -9,6 +12,7 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/assert"
 	mocks "github.com/weni/whatsapp-router/mocks/services"
 	"github.com/weni/whatsapp-router/models"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -19,29 +23,53 @@ func TestContactTokenConfirmation(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockChannelService := mocks.NewMockChannelService(ctrl)
-	dummyChannel := models.Channel{
-		primitive.NilObjectID,
-		"21ee95f6-3776-4b1e-aabc-742eb5dc9170",
-		"local test",
-		"MK3avjS7g",
+	mockContactService := mocks.NewMockContactService(ctrl)
+	mockCourierService := mocks.NewMockCourierService(ctrl)
+	mockWhatsappService := mocks.NewMockWhatsappService(ctrl)
+
+	channelID := primitive.NewObjectID()
+
+	dummyChannel := &models.Channel{
+		ID:    channelID,
+		UUID:  "21ee95f6-3776-4b1e-aabc-742eb5dc9170",
+		Name:  "local test",
+		Token: "localtest-whatsapp-demo-44a2m17t0x",
 	}
-	//TODO change token value to new type
-	mockChannelService.EXPECT().FindChannelByToken("MK3avjS7g").Return(
+	mockChannelService.EXPECT().FindChannelByToken("localtest-whatsapp-demo-44a2m17t0x").Return(
 		dummyChannel,
 		nil,
 	)
-
-	mockContactService := mocks.NewMockContactService(ctrl)
-	dummyContact := models.Contact{
-		primitive.NilObjectID,
-		"5582988887777",
-		"Dummy",
-		primitive.NilObjectID,
+	dummyContact := &models.Contact{
+		URN:     "5582988887777",
+		Name:    "Dummy",
+		Channel: primitive.NilObjectID,
 	}
-	mockContactService.EXPECT().FindContact(dummyContact).Return(nil, errors.New("contact not found"))
-	mockContactService.EXPECT().CreateContact(dummyContact).Return(dummyContact, nil)
 
-	wh := WhatsappHandler{mockContactService, mockChannelService}
+	newDummyContact := &models.Contact{
+		URN:     "5582988887777",
+		Name:    "Dummy",
+		Channel: channelID,
+	}
+
+	urn := newDummyContact.URN
+	payload := fmt.Sprintf(
+		`{"to":"%s","type":"text","text":{"body":"%s"}}`,
+		urn,
+		confirmationMessage,
+	)
+	dummyPayloadBytes := []byte(payload)
+
+	mockContactService.EXPECT().FindContact(dummyContact).Return(nil, errors.New("contact not found"))
+	mockContactService.EXPECT().CreateContact(newDummyContact).Return(newDummyContact, nil)
+	mockWhatsappService.EXPECT().SendMessage(dummyPayloadBytes).Return(
+		http.Header{
+			"content-type": {"application/json"},
+		},
+		ioutil.NopCloser(bytes.NewReader([]byte(`{"messages":{"id":"gBEGVYKZRIIyAgmiTgezkroUL2Q"}],"meta":{"api_status":"stable","version":"2.35.2"}}`))),
+		nil,
+	)
+
+	wh := WhatsappHandler{mockContactService, mockChannelService, mockCourierService, mockWhatsappService}
 
 	router := chi.NewRouter()
 	router.Post("/wr/receive/", wh.HandleIncomingRequests)
@@ -50,8 +78,10 @@ func TestContactTokenConfirmation(t *testing.T) {
 		http.MethodPost,
 		"/wr/receive/",
 		strings.NewReader(
-			`{"contacts":[{"profile":{"name":"user_name"},"wa_id":"12341341234"}],"messages":[{"from":"558299990000","id":"123456","text":{"body":"hi dude."},"timestamp":"623123123123","type":"text"}]}`))
+			`{"contacts":[{"profile":{"name":"Dummy"},"wa_id":"12341341234"}],"messages":[{"from":"5582988887777","id":"123456","text":{"body":"localtest-whatsapp-demo-44a2m17t0x"},"timestamp":"623123123123","type":"text"}]}`))
 	response := httptest.NewRecorder()
 
 	router.ServeHTTP(response, request)
+
+	assert.Equal(t, response.Code, 201)
 }
