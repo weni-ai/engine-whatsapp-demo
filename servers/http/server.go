@@ -56,8 +56,13 @@ func NewRouter(s *Server) *chi.Mux {
 	contactRepoDb := repositories.NewContactRepositoryDb(s.db)
 	channelRepoDb := repositories.NewChannelRepositoryDb(s.db)
 	whatsappHandler := handlers.WhatsappHandler{
-		ContactService: services.NewContactService(contactRepoDb),
-		ChannelService: services.NewChannelService(channelRepoDb),
+		ContactService:  services.NewContactService(contactRepoDb),
+		ChannelService:  services.NewChannelService(channelRepoDb),
+		CourierService:  services.NewCourierService(),
+		WhatsappService: services.NewWhatsappService(),
+	}
+	courierHandler := handlers.CourierHandler{
+		WhatsappService: services.NewWhatsappService(),
 	}
 
 	router.Route("/wr/", func(r chi.Router) {
@@ -68,7 +73,7 @@ func NewRouter(s *Server) *chi.Mux {
 	})
 
 	router.Route("/v1", func(r chi.Router) {
-		r.Post("/messages", handlers.HandleSendMessage)
+		r.Post("/messages", courierHandler.HandleSendMessage)
 		r.Post("/users/login", handlers.RefreshToken)
 	})
 

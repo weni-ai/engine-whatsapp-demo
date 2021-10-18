@@ -1,9 +1,10 @@
 package handlers
 
 import (
-	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -15,76 +16,79 @@ import (
 	"github.com/weni/whatsapp-router/services"
 )
 
+const confirmationMessage = "Token válido, Whatsapp demo está pronto para sua utilização"
+
 type WhatsappHandler struct {
-	ContactService services.ContactService
-	ChannelService services.ChannelService
+	ContactService  services.ContactService
+	ChannelService  services.ChannelService
+	CourierService  services.CourierService
+	WhatsappService services.WhatsappService
 }
 
 func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.Request) {
-	incomingMsg := MessagePayload{}
-
-	if err := json.NewDecoder(r.Body).Decode(&incomingMsg); err != nil {
+	incomingMsg, err := ioutil.ReadAll(r.Body)
+	if err != nil {
 		logger.Error("unexpected server error - " + err.Error())
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, err.Error())
 		return
 	}
 
-	incomingContact := incomingMsg.ToContact()
+	incomingContact := parseToContact(string(incomingMsg))
 	if incomingContact == nil {
-		logger.Error("bad request for logical error")
+		err := errors.New("request without being from a contact")
+		logger.Debug(fmt.Sprintf("%v: %v", err.Error(), string(incomingMsg)))
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, err.Error())
 		return
 	}
 
 	contact, err := h.ContactService.FindContact(incomingContact)
 	if err != nil {
-		logger.Error(err.Error())
+		logger.Debug(err.Error())
 	}
 
 	if contact != nil {
 		channelId := contact.Channel.Hex()
-		channel, err2 := h.ChannelService.FindChannelById(channelId)
-		if err2 != nil {
-			logger.Error(err.Error())
+		channel, err := h.ChannelService.FindChannelById(channelId)
+		if err != nil {
+			logger.Debug(err.Error())
 		}
 		if channel != nil {
-			jsonMsg, _ := json.Marshal(incomingMsg)
 			channelUUID := channel.UUID
-			RedirectRequest(r, channelUUID, string(jsonMsg))
+			status, err := h.CourierService.RedirectMessage(channelUUID, string(incomingMsg))
+			if err != nil {
+				logger.Debug(err.Error())
+				w.WriteHeader(status)
+				fmt.Fprint(w, err)
+			}
 		}
 
 	} else {
-		possibleToken := incomingMsg.Messages[0].Text.Body
-		ch, err := h.ChannelService.FindChannelByToken(possibleToken)
-		if err != nil {
-			logger.Error(err.Error())
+		if possibleToken := extractTextMessage(string(incomingMsg)); possibleToken != "" {
+			ch, err := h.ChannelService.FindChannelByToken(possibleToken)
+			if err != nil {
+				logger.Error(err.Error())
+			}
+			if ch != nil {
+				incomingContact.Channel = ch.ID
+				h.ContactService.CreateContact(incomingContact)
+				_, b, err := h.sendTokenConfirmation(incomingContact)
+				if err != nil {
+					logger.Error(err.Error())
+					w.WriteHeader(http.StatusInternalServerError)
+				} else {
+					body, _ := ioutil.ReadAll(b)
+					logger.Info(string(body))
+					w.WriteHeader(http.StatusCreated)
+				}
+				fmt.Fprint(w, b)
+				return
+			}
 		}
-		if ch != nil {
-			incomingContact.Channel = ch.ID
-			h.ContactService.CreateContact(incomingContact)
-			sendConfirmationMessage(incomingContact)
-		}
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, errors.New("contact not found and token not valid"))
 	}
-}
-
-func RedirectRequest(r *http.Request, channelUUID string, msg string) {
-	courierBaseURL := config.GetConfig().Server.CourierBaseURL
-	url := fmt.Sprintf("%v/%v/receive", courierBaseURL, channelUUID)
-	resp, err := http.Post(
-		url,
-		"application/json",
-		bytes.NewBuffer([]byte(msg)))
-
-	if err != nil {
-		logger.Error(err.Error())
-		return
-	}
-
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		logger.Error(err.Error())
-		return
-	}
-	logger.Info(fmt.Sprintf("SENT: %v", string(body)))
 }
 
 func RefreshToken(w http.ResponseWriter, r *http.Request) {
@@ -111,7 +115,16 @@ func RefreshToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var login LoginPayload
+	var login struct {
+		Users []struct {
+			Token        string
+			ExpiresAfter string
+		}
+		Meta struct {
+			Version   string
+			ApiStatus string
+		}
+	}
 
 	if err := json.NewDecoder(res.Body).Decode(&login); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -132,76 +145,53 @@ func RefreshToken(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, string(b))
 }
 
-func sendConfirmationMessage(contact *models.Contact) {
-	message := "Token válido, Whatsapp demo está pronto para sua utilização"
+func (h *WhatsappHandler) sendTokenConfirmation(contact *models.Contact) (http.Header, io.ReadCloser, error) {
 	urn := contact.URN
 	payload := fmt.Sprintf(
 		`{"to":"%s","type":"text","text":{"body":"%s"}}`,
 		urn,
-		message,
+		confirmationMessage,
 	)
 	payloadBytes := []byte(payload)
 
-	wconfig := config.GetConfig().Whatsapp
-
-	httpClient := &http.Client{}
-	reqPath := "/v1/messages"
-
-	reqURL, _ := url.Parse(wconfig.BaseURL + reqPath)
-	req := &http.Request{
-		Method: "POST",
-		URL:    reqURL,
-		Header: map[string][]string{
-			"Content-Type":  {"application/json; charset=UTF-8"},
-			"Authorization": {"Bearer " + wconfig.AuthToken},
-		},
-		Body: ioutil.NopCloser(bytes.NewReader(payloadBytes)),
-	}
-
-	res, err := httpClient.Do(req)
-	if err != nil {
-		logger.Error(err.Error())
-	} else {
-		body, _ := ioutil.ReadAll(res.Body)
-		logger.Info(string(body))
-	}
+	return h.WhatsappService.SendMessage(payloadBytes)
 }
 
-type MessagePayload struct {
-	Contacts []struct {
-		Profile struct {
-			Name string `json:"name"`
-		} `json:"profile"`
-		WaID string `json:"wa_id"`
-	} `json:"contacts"`
-	Messages []struct {
-		From string `json:"from"`
-		ID   string `json:"id"`
-		Text struct {
-			Body string `json:"body"`
-		} `json:"text"`
-		Timestamp string `json:"timestamp"`
-		Type      string `json:"type"`
-	} `json:"messages"`
-}
-
-type LoginPayload struct {
-	Users []struct {
-		Token        string
-		ExpiresAfter string
-	}
-	Meta struct {
-		Version   string
-		ApiStatus string
-	}
-}
-
-func (m *MessagePayload) ToContact() *models.Contact {
-	if len(m.Messages) > 0 && len(m.Contacts) > 0 {
+func parseToContact(m string) *models.Contact {
+	name := extractName(m)
+	number := extractNumber(m)
+	if name != "" && number != "" {
 		return &models.Contact{
-			URN:  m.Messages[0].From,
-			Name: m.Contacts[0].Profile.Name,
+			URN:  number,
+			Name: name,
 		}
 	}
 	return nil
+}
+
+func extractName(m string) string {
+	var result map[string][]map[string]map[string]interface{}
+	json.Unmarshal([]byte(m), &result)
+	if result["contacts"] != nil {
+		return result["contacts"][0]["profile"]["name"].(string)
+	}
+	return ""
+}
+
+func extractNumber(m string) string {
+	var result map[string][]map[string]interface{}
+	json.Unmarshal([]byte(m), &result)
+	if result["messages"] != nil {
+		return result["messages"][0]["from"].(string)
+	}
+	return ""
+}
+
+func extractTextMessage(m string) string {
+	var result map[string][]map[string]map[string]interface{}
+	json.Unmarshal([]byte(m), &result)
+	if result["messages"] != nil {
+		return result["messages"][0]["text"]["body"].(string)
+	}
+	return ""
 }

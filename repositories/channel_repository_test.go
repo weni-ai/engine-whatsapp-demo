@@ -25,7 +25,8 @@ var tcInsertChannel = []struct {
 }
 
 func TestInsertChannel(t *testing.T) {
-	mongodb := storage.NewDB()
+	mongodb := storage.NewTestDB()
+	defer storage.CloseDB(mongodb)
 	channelRepository := ChannelRepositoryDb{DB: mongodb}
 
 	for _, tc := range tcInsertChannel {
@@ -47,7 +48,7 @@ var tcFindOneChannel = []struct {
 	{
 		TestName: "Find one existing channel",
 		Channel: models.Channel{
-			UUID:  "491bab89-5998-4cf4-896b-afab3c5e1090",
+			UUID:  "f11c744c-4937-4ee3-8a51-26e56eb77c4e",
 			Name:  "foo",
 			Token: "foo-bar-zaz",
 		},
@@ -55,7 +56,8 @@ var tcFindOneChannel = []struct {
 }
 
 func TestFindOneChannel(t *testing.T) {
-	mongodb := storage.NewDB()
+	mongodb := storage.NewTestDB()
+	defer storage.CloseDB(mongodb)
 	channelRepository := ChannelRepositoryDb{DB: mongodb}
 
 	for _, tc := range tcFindOneChannel {
