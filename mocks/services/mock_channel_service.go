@@ -5,10 +5,12 @@
 package mocks
 
 import (
+	context "context"
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
 	models "github.com/weni/whatsapp-router/models"
+	pb "github.com/weni/whatsapp-router/servers/grpc/pb"
 )
 
 // MockChannelService is a mock of ChannelService interface.
@@ -32,6 +34,21 @@ func NewMockChannelService(ctrl *gomock.Controller) *MockChannelService {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockChannelService) EXPECT() *MockChannelServiceMockRecorder {
 	return m.recorder
+}
+
+// CreateChannel mocks base method.
+func (m *MockChannelService) CreateChannel(arg0 context.Context, arg1 *pb.ChannelRequest) (*pb.ChannelResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateChannel", arg0, arg1)
+	ret0, _ := ret[0].(*pb.ChannelResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateChannel indicates an expected call of CreateChannel.
+func (mr *MockChannelServiceMockRecorder) CreateChannel(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateChannel", reflect.TypeOf((*MockChannelService)(nil).CreateChannel), arg0, arg1)
 }
 
 // FindChannel mocks base method.
