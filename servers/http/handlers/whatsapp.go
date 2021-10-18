@@ -56,7 +56,6 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 		}
 		if channel != nil {
 			channelUUID := channel.UUID
-			// RedirectRequest(channelUUID, string(jsonMsg))
 			status, err := h.CourierService.RedirectMessage(channelUUID, string(incomingMsg))
 			if err != nil {
 				logger.Debug(err.Error())
