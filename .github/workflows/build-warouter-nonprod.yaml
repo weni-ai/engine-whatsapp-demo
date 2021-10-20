@@ -26,8 +26,8 @@ jobs:
         uses: docker/login-action@v1 
         with:
           registry: 869898323958.dkr.ecr.us-east-1.amazonaws.com
-          username: ${{ secrets.DNX_AK }}
-          password: ${{ secrets.DNX_SK }}
+          username: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          password: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       - name: Build and push - WhatsApp Router Image
         id: docker_build1
         uses: docker/build-push-action@v2
