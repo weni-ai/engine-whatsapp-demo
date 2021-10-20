@@ -50,7 +50,7 @@ jobs:
       - name: Update image deployment 01
         uses: mikefarah/yq@master
         with:
-          cmd: yq e  '.spec.template.spec.containers[0].image = env(IMAGE_TAG)' -i ./kuberentes-manifests/whatsapp-router/whatsapp-deployment.yaml
+          cmd: yq e  '.spec.template.spec.containers[0].image = env(IMAGE_TAG)' -i ./kuberentes-manifests/whatsapp-router/whatsapp-router-deployment.yaml
       - name: Commit & Push changes in Kuberentes Manifests
         uses: actions-js/push@master
         with:
