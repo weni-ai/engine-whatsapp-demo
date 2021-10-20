@@ -1,0 +1,60 @@
+name: Build WhatsApp Router Develop
+on:
+  push:
+    tags:
+      - 'v*.*.*-develop*'
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    environment: 
+      name: develop
+    steps:
+      - name: Set output
+        id: vars
+        run: |
+          echo ::set-output name=branch::$(echo ${GITHUB_REF#refs/heads/}|cut -d'-' -f3-4|tr -s '-' '/');
+          echo ::set-output name=tag::$(echo ${GITHUB_REF#refs/heads/}|cut -d'/' -f3-|cut -d'-' -f1-2);
+      - name: Check out the repo
+        uses: actions/checkout@v2
+        with:
+          ref:  ${{ steps.vars.ouptuts.branch }}
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+      - name: Login to ECR
+        uses: docker/login-action@v1 
+        with:
+          registry: 869898323958.dkr.ecr.us-east-1.amazonaws.com
+          username: ${{ secrets.DNX_AK }}
+          password: ${{ secrets.DNX_SK }}
+      - name: Build and push - WhatsApp Router Image
+        id: docker_build1
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          file: docker/Dockerfile
+          push: true
+          tags: 869898323958.dkr.ecr.us-east-1.amazonaws.com/whatsapp-router:${{ steps.vars.outputs.tag }}
+          no-cache: true
+      - name: Check out Kubernetes Manifests
+        uses: actions/checkout@master
+        with:
+          ref: nonprod
+          repository: Ilhasoft/kubernetes-manifests
+          token: ${{ secrets.CICEROW_GITHUB_PERMANENT_TOKEN }}
+          path: ./kuberentes-manifests/
+      - name: Set variable tag for yq
+        run: |
+            echo "IMAGE_TAG=869898323958.dkr.ecr.us-east-1.amazonaws.com/whatsapp-router:${{ steps.vars.outputs.tag }}" >> $GITHUB_ENV
+      - name: Update image deployment 01
+        uses: mikefarah/yq@master
+        with:
+          cmd: yq e  '.spec.template.spec.containers[0].image = env(IMAGE_TAG)' -i whatsapp-router/whatsapp-deployment.yaml
+      - name: Commit & Push changes in Kuberentes Manifests
+        uses: actions-js/push@master
+        with:
+          github_token: ${{ secrets.CICEROW_GITHUB_PERMANENT_TOKEN }}
+          repository: Ilhasoft/kubernetes-manifests
+          directory: ./kuberentes-manifests/
+          branch: nonprod
