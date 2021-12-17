@@ -75,6 +75,13 @@ func NewRouter(s *Server) *chi.Mux {
 	router.Route("/v1", func(r chi.Router) {
 		r.Post("/messages", courierHandler.HandleSendMessage)
 		r.Post("/users/login", handlers.RefreshToken)
+		r.Get("/settings/application", func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		})
+	})
+
+	router.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
 	})
 
 	return router
