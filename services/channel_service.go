@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 
+	"github.com/weni/whatsapp-router/logger"
 	"github.com/weni/whatsapp-router/models"
 	"github.com/weni/whatsapp-router/repositories"
 	"github.com/weni/whatsapp-router/servers/grpc/pb"
@@ -46,7 +47,11 @@ func (s DefaultChannelService) CreateChannel(ctx context.Context, req *pb.Channe
 	channel.Name = req.GetName()
 	token := utils.GenToken(channel.Name)
 	channel.Token = token
-	s.repo.Insert(&channel)
+	err := s.repo.Insert(&channel)
+	if err != nil {
+		logger.Error(err.Error())
+		return nil, err
+	}
 	return &pb.ChannelResponse{
 		Token: channel.Token,
 	}, nil
