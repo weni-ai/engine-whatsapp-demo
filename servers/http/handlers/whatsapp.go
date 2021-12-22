@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -126,7 +127,17 @@ func RefreshToken(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if err := json.NewDecoder(res.Body).Decode(&login); err != nil {
+	bdBytes, err := io.ReadAll(res.Body)
+	defer res.Body.Close()
+	if err != nil {
+		logger.Error(err.Error())
+		return
+	}
+
+	bdString := string(bdBytes)
+	log.Println(bdString)
+
+	if err := json.Unmarshal(bdBytes, &login); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprint(w, err.Error())
 		logger.Error(err.Error())
@@ -138,11 +149,10 @@ func RefreshToken(w http.ResponseWriter, r *http.Request) {
 	config.UpdateToken(newToken)
 	logger.Info("Whatsapp token update")
 	w.WriteHeader(http.StatusOK)
-	b, _ := json.Marshal(login)
 	for k, v := range res.Header {
 		w.Header().Set(k, strings.Join(v, ""))
 	}
-	fmt.Fprint(w, string(b))
+	fmt.Fprint(w, bdString)
 }
 
 func (h *WhatsappHandler) sendTokenConfirmation(contact *models.Contact) (http.Header, io.ReadCloser, error) {
