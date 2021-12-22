@@ -49,47 +49,71 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 		logger.Debug(err.Error())
 	}
 
-	if contact != nil {
-		channelId := contact.Channel.Hex()
-		channel, err := h.ChannelService.FindChannelById(channelId)
+	if possibleToken := extractTextMessage(string(incomingMsg)); possibleToken != "" {
+		channelFromToken, err := h.ChannelService.FindChannelByToken(possibleToken)
 		if err != nil {
-			logger.Debug(err.Error())
+			logger.Error(err.Error())
 		}
-		if channel != nil {
-			channelUUID := channel.UUID
-			status, err := h.CourierService.RedirectMessage(channelUUID, string(incomingMsg))
-			if err != nil {
-				logger.Debug(err.Error())
-				w.WriteHeader(status)
-				fmt.Fprint(w, err)
-			}
-		}
-
-	} else {
-		if possibleToken := extractTextMessage(string(incomingMsg)); possibleToken != "" {
-			ch, err := h.ChannelService.FindChannelByToken(possibleToken)
-			if err != nil {
-				logger.Error(err.Error())
-			}
-			if ch != nil {
-				incomingContact.Channel = ch.ID
-				h.ContactService.CreateContact(incomingContact)
-				_, b, err := h.sendTokenConfirmation(incomingContact)
+		if channelFromToken != nil {
+			incomingContact.Channel = channelFromToken.ID
+			if contact != nil {
+				contact.Channel = channelFromToken.ID
+				_, err = h.ContactService.UpdateContact(contact)
+				if err != nil {
+					logger.Error(err.Error())
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+				_, b, err := h.sendTokenConfirmation(contact)
 				if err != nil {
 					logger.Error(err.Error())
 					w.WriteHeader(http.StatusInternalServerError)
+					return
 				} else {
 					body, _ := ioutil.ReadAll(b)
-					logger.Info(string(body))
-					w.WriteHeader(http.StatusCreated)
+					logger.Debug(string(body))
+					w.WriteHeader(http.StatusOK)
+					return
 				}
-				fmt.Fprint(w, b)
-				return
+			} else {
+				_, err := h.ContactService.CreateContact(incomingContact)
+				if err != nil {
+					logger.Error(err.Error())
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+				_, b, err := h.sendTokenConfirmation(incomingContact)
+				if err != nil {
+					logger.Error(err.Error())
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+				} else {
+					body, _ := ioutil.ReadAll(b)
+					logger.Debug(string(body))
+					w.WriteHeader(http.StatusOK)
+					return
+				}
+			}
+		} else {
+			if contact != nil {
+				channelId := contact.Channel.Hex()
+				channel, err := h.ChannelService.FindChannelById(channelId)
+				if err != nil {
+					logger.Debug(err.Error())
+				}
+				if channel != nil {
+					channelUUID := channel.UUID
+					status, err := h.CourierService.RedirectMessage(channelUUID, string(incomingMsg))
+					if err != nil {
+						logger.Debug(err.Error())
+						w.WriteHeader(status)
+						fmt.Fprint(w, err)
+					}
+				}
 			}
 		}
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, errors.New("contact not found and token not valid"))
 	}
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprint(w, errors.New("contact not found and token not valid"))
 }
 
 func RefreshToken(w http.ResponseWriter, r *http.Request) {
