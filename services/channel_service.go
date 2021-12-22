@@ -45,7 +45,7 @@ func (s DefaultChannelService) CreateChannel(ctx context.Context, req *pb.Channe
 	var channel models.Channel
 	channel.UUID = req.GetUuid()
 	channel.Name = req.GetName()
-	token := utils.GenToken(channel.Name)
+	token := utils.GenToken()
 	channel.Token = token
 	err := s.repo.Insert(&channel)
 	if err != nil {

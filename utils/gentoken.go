@@ -3,26 +3,24 @@ package utils
 import (
 	"fmt"
 	"math/rand"
-	"strings"
 	"time"
 )
 
-const lowerChars = "0123456789abcdefghijklmnopqrstuvwxyz"
+const chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_"
 const sufixLength = 10
 
-const crumb = "whatsapp-demo"
+const crumb = "weni-demo"
 
 func genTokenSufix() string {
 	rand.Seed(time.Now().UTC().UnixNano())
 	b := make([]byte, sufixLength)
 	for i := range b {
-		b[i] = lowerChars[rand.Intn(len(lowerChars))]
+		b[i] = chars[rand.Intn(len(chars))]
 	}
 	return string(b)
 }
 
-func GenToken(prefixName string) string {
-	formatedName := strings.ToLower(strings.ReplaceAll(prefixName, " ", ""))
+func GenToken() string {
 	sufix := genTokenSufix()
-	return fmt.Sprintf("%s-%s-%s", formatedName, crumb, sufix)
+	return fmt.Sprintf("%s-%s", crumb, sufix)
 }
