@@ -7,7 +7,6 @@ import (
 
 	"github.com/joeshaw/envdecode"
 	"github.com/joho/godotenv"
-	"github.com/weni/whatsapp-router/logger"
 )
 
 type Config struct {
@@ -20,6 +19,7 @@ type ServerConfig struct {
 	HttpPort       int32  `env:"SERVER_HTTP_PORT,required"`
 	GRPCPort       int32  `env:"SERVER_GRPC_PORT,required"`
 	CourierBaseURL string `env:"SERVER_COURIER_BASE_URL"`
+	SentryDSN      string `env:"SERVER_SENTRY_DSN"`
 }
 
 type DbConfig struct {
@@ -42,19 +42,19 @@ var AppConf *Config
 
 func GetConfig() *Config {
 	if AppConf == nil {
-		logger.Info("loading config")
+		log.Println("loading config")
 		AppConf = &Config{}
 
 		_, hasEnvVars := os.LookupEnv("DB_HOST")
 		if !hasEnvVars {
 			if err := godotenv.Load("./config/.env"); err != nil {
-				logger.Error(fmt.Sprintf("Error loading .env file: %v", err.Error()))
+				log.Println(fmt.Sprintf("Error loading .env file: %v", err.Error()))
 			}
 		}
 
-		if err := envdecode.StrictDecode(AppConf); err != nil {
-			logger.Error(fmt.Sprintf("Failed to decode and load environment variables: %v", err.Error()))
-			log.Fatal()
+		if err := envdecode.Decode(AppConf); err != nil {
+			log.Println(fmt.Sprintf("Failed to decode and load environment variables: %v", err.Error()))
+			os.Exit(1)
 		}
 	}
 	return AppConf
