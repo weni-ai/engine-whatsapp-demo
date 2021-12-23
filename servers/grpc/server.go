@@ -2,8 +2,8 @@ package grpc
 
 import (
 	"fmt"
-	"log"
 	"net"
+	"os"
 
 	"github.com/weni/whatsapp-router/config"
 	"github.com/weni/whatsapp-router/logger"
@@ -40,7 +40,7 @@ func (s *Server) Start() error {
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
 		logger.Error(err.Error())
-		log.Fatal()
+		os.Exit(1)
 		return err
 	}
 
@@ -50,7 +50,7 @@ func (s *Server) Start() error {
 		err = s.grpcServer.Serve(listener)
 		if err != nil {
 			logger.Error(err.Error())
-			log.Fatal()
+			os.Exit(1)
 		}
 	}()
 

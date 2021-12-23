@@ -33,9 +33,9 @@ func TestContactTokenConfirmation(t *testing.T) {
 		ID:    channelID,
 		UUID:  "21ee95f6-3776-4b1e-aabc-742eb5dc9170",
 		Name:  "local test",
-		Token: "localtest-whatsapp-demo-44a2m17t0x",
+		Token: "weni-demo-44a2m17t0x",
 	}
-	mockChannelService.EXPECT().FindChannelByToken("localtest-whatsapp-demo-44a2m17t0x").Return(
+	mockChannelService.EXPECT().FindChannelByToken("weni-demo-44a2m17t0x").Return(
 		dummyChannel,
 		nil,
 	)
@@ -78,12 +78,12 @@ func TestContactTokenConfirmation(t *testing.T) {
 		http.MethodPost,
 		"/wr/receive/",
 		strings.NewReader(
-			`{"contacts":[{"profile":{"name":"Dummy"},"wa_id":"12341341234"}],"messages":[{"from":"5582988887777","id":"123456","text":{"body":"localtest-whatsapp-demo-44a2m17t0x"},"timestamp":"623123123123","type":"text"}]}`))
+			`{"contacts":[{"profile":{"name":"Dummy"},"wa_id":"12341341234"}],"messages":[{"from":"5582988887777","id":"123456","text":{"body":"weni-demo-44a2m17t0x"},"timestamp":"623123123123","type":"text"}]}`))
 	response := httptest.NewRecorder()
 
 	router.ServeHTTP(response, request)
 
-	assert.Equal(t, response.Code, 201)
+	assert.Equal(t, response.Code, 200)
 }
 
 func TestSendMessage(t *testing.T) {
@@ -101,7 +101,7 @@ func TestSendMessage(t *testing.T) {
 		ID:    channelID,
 		UUID:  "21ee95f6-3776-4b1e-aabc-742eb5dc9170",
 		Name:  "local test",
-		Token: "localtest-whatsapp-demo-44a2m17t0x",
+		Token: "weni-44a2m17t0x",
 	}
 
 	incomingDummyContact := &models.Contact{
@@ -116,9 +116,9 @@ func TestSendMessage(t *testing.T) {
 	}
 
 	incomingRequest := `{"contacts":[{"profile":{"name":"Dummy"},"wa_id":"12341341234"}],"messages":[{"from":"5582988887777","id":"123456","text":{"body":"hello"},"timestamp":"623123123123","type":"text"}]}`
+
 	mockContactService.EXPECT().FindContact(incomingDummyContact).Return(dummyContact, nil)
 	mockChannelService.EXPECT().FindChannelById(channelID.Hex()).Return(dummyChannel, nil)
-	mockChannelService.EXPECT().FindChannelByToken(extractTextMessage(incomingRequest)).Return(nil, nil)
 	mockCourierService.EXPECT().RedirectMessage(dummyChannel.UUID, incomingRequest).Return(http.StatusOK, nil)
 
 	wh := WhatsappHandler{mockContactService, mockChannelService, mockCourierService, mockWhatsappService}
@@ -152,14 +152,14 @@ func TestContactTokenUpdate(t *testing.T) {
 		ID:    primitive.NewObjectID(),
 		UUID:  "21ee95f6-3776-4b1e-aabc-742eb5dc9170",
 		Name:  "local test",
-		Token: "localtest-whatsapp-demo-44a2m17t0x",
+		Token: "weni-demo-44a2m17t0x",
 	}
 
 	dummyChannel2 := &models.Channel{
 		ID:    primitive.NewObjectID(),
 		UUID:  "21ee95f6-3776-4b1e-aabc-742eb5dc9170",
 		Name:  "local test",
-		Token: "localtest-whatsapp-demo-1234567890",
+		Token: "weni-demo-1234567890",
 	}
 
 	incomingDummyContact := &models.Contact{
@@ -187,7 +187,7 @@ func TestContactTokenUpdate(t *testing.T) {
 	)
 	dummyPayloadBytes := []byte(payload)
 
-	incomingRequest := `{"contacts":[{"profile":{"name":"Dummy"},"wa_id":"12341341234"}],"messages":[{"from":"5582988887777","id":"123456","text":{"body":"localtest-whatsapp-demo-1234567890"},"timestamp":"623123123123","type":"text"}]}`
+	incomingRequest := `{"contacts":[{"profile":{"name":"Dummy"},"wa_id":"12341341234"}],"messages":[{"from":"5582988887777","id":"123456","text":{"body":"weni-demo-1234567890"},"timestamp":"623123123123","type":"text"}]}`
 	mockContactService.EXPECT().FindContact(incomingDummyContact).Return(dummyContact, nil)
 	mockContactService.EXPECT().UpdateContact(dummyContact).Return(dummyUpdatedContact, nil)
 	mockChannelService.EXPECT().FindChannelByToken(extractTextMessage(incomingRequest)).Return(dummyChannel2, nil)

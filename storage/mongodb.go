@@ -3,7 +3,6 @@ package storage
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/weni/whatsapp-router/config"
@@ -43,12 +42,12 @@ func NewTestDB() *mongo.Database {
 	defer ctxCancel()
 	connection, err := mongo.Connect(ctx, options)
 	if err != nil {
-		logger.Error("mongodb FAIL")
+		logger.Error(fmt.Sprintf("mongodb FAIL: %s", err.Error()))
 		panic(err.Error())
 	}
 
 	if err := connection.Ping(context.TODO(), readpref.Primary()); err != nil {
-		logger.Error("mongodb FAIL")
+		logger.Error(fmt.Sprintf("mongodb FAIL: %s", err.Error()))
 		panic(err.Error())
 	} else {
 		logger.Info("mongodb OK")
@@ -61,7 +60,6 @@ func NewTestDB() *mongo.Database {
 func CloseDB(db *mongo.Database) {
 	if err := db.Client().Disconnect(context.TODO()); err != nil {
 		logger.Error(fmt.Sprintf("Error on close MongoDB: %v", err))
-		log.Fatal()
-
+		panic(err.Error())
 	}
 }

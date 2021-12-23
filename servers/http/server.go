@@ -2,8 +2,8 @@ package http
 
 import (
 	"fmt"
-	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/go-chi/chi"
@@ -43,7 +43,7 @@ func (s *Server) Start() error {
 		err := s.httpServer.ListenAndServe()
 		if err != nil && err != http.ErrServerClosed {
 			logger.Error(err.Error())
-			log.Fatal()
+			os.Exit(1)
 		}
 	}()
 

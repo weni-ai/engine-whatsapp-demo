@@ -19,6 +19,8 @@ import (
 
 const confirmationMessage = "Token válido, Whatsapp demo está pronto para sua utilização"
 
+const tokenPrefix = "weni-demo"
+
 type WhatsappHandler struct {
 	ContactService  services.ContactService
 	ChannelService  services.ChannelService
@@ -49,48 +51,52 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 		logger.Debug(err.Error())
 	}
 
-	if possibleToken := extractTextMessage(string(incomingMsg)); possibleToken != "" {
-		channelFromToken, err := h.ChannelService.FindChannelByToken(possibleToken)
-		if err != nil {
-			logger.Error(err.Error())
-		}
-		if channelFromToken != nil {
-			incomingContact.Channel = channelFromToken.ID
-			if contact != nil {
-				contact.Channel = channelFromToken.ID
-				_, err = h.ContactService.UpdateContact(contact)
-				if err != nil {
-					logger.Error(err.Error())
-					http.Error(w, err.Error(), http.StatusInternalServerError)
-					return
-				}
-				_, b, err := h.sendTokenConfirmation(contact)
-				if err != nil {
-					logger.Error(err.Error())
-					w.WriteHeader(http.StatusInternalServerError)
-					return
+	textMessage := extractTextMessage(string(incomingMsg))
+
+	if textMessage != "" {
+		if strings.Contains(textMessage, tokenPrefix) {
+			channelFromToken, err := h.ChannelService.FindChannelByToken(textMessage)
+			if err != nil {
+				logger.Debug(err.Error())
+			}
+			if channelFromToken != nil {
+				incomingContact.Channel = channelFromToken.ID
+				if contact != nil {
+					contact.Channel = channelFromToken.ID
+					_, err = h.ContactService.UpdateContact(contact)
+					if err != nil {
+						logger.Error(err.Error())
+						http.Error(w, err.Error(), http.StatusInternalServerError)
+						return
+					}
+					_, b, err := h.sendTokenConfirmation(contact)
+					if err != nil {
+						logger.Error(err.Error())
+						w.WriteHeader(http.StatusInternalServerError)
+						return
+					} else {
+						body, _ := ioutil.ReadAll(b)
+						logger.Debug(string(body))
+						w.WriteHeader(http.StatusOK)
+						return
+					}
 				} else {
-					body, _ := ioutil.ReadAll(b)
-					logger.Debug(string(body))
-					w.WriteHeader(http.StatusOK)
-					return
-				}
-			} else {
-				_, err := h.ContactService.CreateContact(incomingContact)
-				if err != nil {
-					logger.Error(err.Error())
-					http.Error(w, err.Error(), http.StatusInternalServerError)
-					return
-				}
-				_, b, err := h.sendTokenConfirmation(incomingContact)
-				if err != nil {
-					logger.Error(err.Error())
-					http.Error(w, err.Error(), http.StatusInternalServerError)
-				} else {
-					body, _ := ioutil.ReadAll(b)
-					logger.Debug(string(body))
-					w.WriteHeader(http.StatusOK)
-					return
+					_, err := h.ContactService.CreateContact(incomingContact)
+					if err != nil {
+						logger.Error(err.Error())
+						http.Error(w, err.Error(), http.StatusInternalServerError)
+						return
+					}
+					_, b, err := h.sendTokenConfirmation(incomingContact)
+					if err != nil {
+						logger.Error(err.Error())
+						http.Error(w, err.Error(), http.StatusInternalServerError)
+					} else {
+						body, _ := ioutil.ReadAll(b)
+						logger.Debug(string(body))
+						w.WriteHeader(http.StatusOK)
+						return
+					}
 				}
 			}
 		} else {
@@ -112,6 +118,7 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 			}
 		}
 	}
+	//returning status ok to avoid retry send mechanisms if contact not exists or token is not valid
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprint(w, errors.New("contact not found and token not valid"))
 }

@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -20,13 +19,13 @@ func main() {
 	httpServer := http.NewServer(db)
 	if err := httpServer.Start(); err != nil {
 		logger.Error(fmt.Sprintf("Server startup failed: %v", err))
-		log.Fatal()
+		os.Exit(1)
 	}
 
 	grpcServer := grpc.NewServer(db)
 	if err := grpcServer.Start(); err != nil {
 		logger.Error(fmt.Sprintf("grpc server startup failed: %v", err))
-		log.Fatal()
+		os.Exit(1)
 	}
 
 	ch := make(chan os.Signal)
