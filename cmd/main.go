@@ -3,10 +3,13 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
+	"github.com/go-co-op/gocron"
 	"github.com/weni/whatsapp-router/config"
 	"github.com/weni/whatsapp-router/logger"
 	"github.com/weni/whatsapp-router/models"
@@ -44,6 +47,8 @@ func main() {
 
 }
 
+const tokenUpdateInterval = 12
+
 func initAuthToken(db *mongo.Database) {
 	configRepo := repositories.NewConfigRepository(db)
 	configService := services.NewConfigService(configRepo)
@@ -71,4 +76,43 @@ func initAuthToken(db *mongo.Database) {
 		}
 	}
 	config.UpdateAuthToken(conf.Token)
+
+	whatsappService := services.NewWhatsappService()
+
+	s := gocron.NewScheduler(time.UTC)
+	s.Every(tokenUpdateInterval).
+		Hour().
+		StartAt(time.Now().Add(time.Hour * tokenUpdateInterval)).
+		Do(func() {
+			res, err := whatsappService.Login()
+			if err != nil {
+				logger.Error(err.Error())
+				return
+			}
+
+			var login services.LoginWhatsapp
+			bdBytes, err := io.ReadAll(res.Body)
+			defer res.Body.Close()
+			if err != nil {
+				logger.Error(err.Error())
+				return
+			}
+			if res.StatusCode != 200 {
+				logger.Error(fmt.Sprintf("Couldn't update token: %s, %s", res.Status, string(bdBytes)))
+				return
+			}
+
+			if err := json.Unmarshal(bdBytes, &login); err != nil {
+				logger.Error(err.Error())
+				return
+			}
+			newToken := login.Users[0].Token
+
+			configService.CreateOrUpdate(&models.Config{Token: newToken})
+
+			config.UpdateAuthToken(newToken)
+			logger.Info("Whatsapp token updated")
+		})
+
+	s.StartAsync()
 }
