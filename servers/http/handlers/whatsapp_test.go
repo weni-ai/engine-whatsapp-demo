@@ -26,6 +26,7 @@ func TestContactTokenConfirmation(t *testing.T) {
 	mockContactService := mocks.NewMockContactService(ctrl)
 	mockCourierService := mocks.NewMockCourierService(ctrl)
 	mockWhatsappService := mocks.NewMockWhatsappService(ctrl)
+	mockConfigService := mocks.NewMockConfigService(ctrl)
 
 	channelID := primitive.NewObjectID()
 
@@ -69,7 +70,7 @@ func TestContactTokenConfirmation(t *testing.T) {
 		nil,
 	)
 
-	wh := WhatsappHandler{mockContactService, mockChannelService, mockCourierService, mockWhatsappService}
+	wh := WhatsappHandler{mockContactService, mockChannelService, mockCourierService, mockWhatsappService, mockConfigService}
 
 	router := chi.NewRouter()
 	router.Post("/wr/receive/", wh.HandleIncomingRequests)
@@ -94,6 +95,7 @@ func TestSendMessage(t *testing.T) {
 	mockContactService := mocks.NewMockContactService(ctrl)
 	mockCourierService := mocks.NewMockCourierService(ctrl)
 	mockWhatsappService := mocks.NewMockWhatsappService(ctrl)
+	mockConfigService := mocks.NewMockConfigService(ctrl)
 
 	channelID := primitive.NewObjectID()
 
@@ -121,7 +123,7 @@ func TestSendMessage(t *testing.T) {
 	mockChannelService.EXPECT().FindChannelById(channelID.Hex()).Return(dummyChannel, nil)
 	mockCourierService.EXPECT().RedirectMessage(dummyChannel.UUID, incomingRequest).Return(http.StatusOK, nil)
 
-	wh := WhatsappHandler{mockContactService, mockChannelService, mockCourierService, mockWhatsappService}
+	wh := WhatsappHandler{mockContactService, mockChannelService, mockCourierService, mockWhatsappService, mockConfigService}
 
 	router := chi.NewRouter()
 	router.Post("/wr/receive/", wh.HandleIncomingRequests)
@@ -147,6 +149,7 @@ func TestContactTokenUpdate(t *testing.T) {
 	mockContactService := mocks.NewMockContactService(ctrl)
 	mockCourierService := mocks.NewMockCourierService(ctrl)
 	mockWhatsappService := mocks.NewMockWhatsappService(ctrl)
+	mockConfigService := mocks.NewMockConfigService(ctrl)
 
 	dummyChannel := &models.Channel{
 		ID:    primitive.NewObjectID(),
@@ -199,7 +202,7 @@ func TestContactTokenUpdate(t *testing.T) {
 		nil,
 	)
 
-	wh := WhatsappHandler{mockContactService, mockChannelService, mockCourierService, mockWhatsappService}
+	wh := WhatsappHandler{mockContactService, mockChannelService, mockCourierService, mockWhatsappService, mockConfigService}
 
 	router := chi.NewRouter()
 	router.Post("/wr/receive/", wh.HandleIncomingRequests)
@@ -214,5 +217,55 @@ func TestContactTokenUpdate(t *testing.T) {
 
 	router.ServeHTTP(response, request)
 
+	assert.Equal(t, response.Code, 200)
+}
+
+func TestRefreshToken(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockChannelService := mocks.NewMockChannelService(ctrl)
+	mockContactService := mocks.NewMockContactService(ctrl)
+	mockCourierService := mocks.NewMockCourierService(ctrl)
+	mockWhatsappService := mocks.NewMockWhatsappService(ctrl)
+	mockConfigService := mocks.NewMockConfigService(ctrl)
+
+	loginBody := `{"users":[{"token":"eyJhbGciOiAiSFMyNTYiLCAidHlwIjogIkpXVCJ9.eyJ1c2VyIjoiQWRtaW4iLCJpYXQiOjE2NDAxODIzMjIsImV4cCI6MTY0MDc4NzEyMiwid2E6cmFuZCI6ImVkMWU5OGU4ZjA4NmIxMDQzNDBlM2MxMGFjNGU3YzY3In0.2pEh32jyfBLUjxWNklEtgOrZqy7TgGj48y5pVTgl7FU","expires_after":"2021-12-29 14:12:02+00:00"}],"meta":{"version":"v2.37.1","api_status":"stable"}}`
+	mockWhatsappService.EXPECT().Login().Return(
+		&http.Response{
+			Header: http.Header{
+				"content-type": {"application/json"},
+			},
+			Body: ioutil.NopCloser(bytes.NewReader(
+				[]byte(
+					loginBody,
+				),
+			)),
+			StatusCode: 200,
+		},
+		nil,
+	)
+
+	conf := &models.Config{
+		Token: "eyJhbGciOiAiSFMyNTYiLCAidHlwIjogIkpXVCJ9.eyJ1c2VyIjoiQWRtaW4iLCJpYXQiOjE2NDAxODIzMjIsImV4cCI6MTY0MDc4NzEyMiwid2E6cmFuZCI6ImVkMWU5OGU4ZjA4NmIxMDQzNDBlM2MxMGFjNGU3YzY3In0.2pEh32jyfBLUjxWNklEtgOrZqy7TgGj48y5pVTgl7FU",
+	}
+
+	mockConfigService.EXPECT().CreateOrUpdate(
+		conf,
+	).Return(conf, nil)
+
+	wh := WhatsappHandler{mockContactService, mockChannelService, mockCourierService, mockWhatsappService, mockConfigService}
+
+	router := chi.NewRouter()
+	testRoute := "/v1/users/login"
+	router.Post(testRoute, wh.RefreshToken)
+	request, _ := http.NewRequest(
+		http.MethodPost,
+		testRoute,
+		nil,
+	)
+
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
 	assert.Equal(t, response.Code, 200)
 }

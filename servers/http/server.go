@@ -55,11 +55,13 @@ func NewRouter(s *Server) *chi.Mux {
 
 	contactRepoDb := repositories.NewContactRepositoryDb(s.db)
 	channelRepoDb := repositories.NewChannelRepositoryDb(s.db)
+	configRepoDb := repositories.NewConfigRepository(s.db)
 	whatsappHandler := handlers.WhatsappHandler{
 		ContactService:  services.NewContactService(contactRepoDb),
 		ChannelService:  services.NewChannelService(channelRepoDb),
 		CourierService:  services.NewCourierService(),
 		WhatsappService: services.NewWhatsappService(),
+		ConfigService:   services.NewConfigService(configRepoDb),
 	}
 	courierHandler := handlers.CourierHandler{
 		WhatsappService: services.NewWhatsappService(),

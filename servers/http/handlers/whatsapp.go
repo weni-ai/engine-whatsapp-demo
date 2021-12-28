@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"strings"
 
@@ -25,6 +24,7 @@ type WhatsappHandler struct {
 	ChannelService  services.ChannelService
 	CourierService  services.CourierService
 	WhatsappService services.WhatsappService
+	ConfigService   services.ConfigService
 }
 
 func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.Request) {
@@ -141,7 +141,13 @@ func (h *WhatsappHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	bdString := string(bdBytes)
-	log.Println(bdString)
+
+	if res.StatusCode != 200 {
+		w.WriteHeader(res.StatusCode)
+		w.Write(bdBytes)
+		logger.Error(fmt.Sprintf("Couldn't update token: %s", bdString))
+		return
+	}
 
 	if err := json.Unmarshal(bdBytes, &login); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -153,7 +159,9 @@ func (h *WhatsappHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 	newToken := login.Users[0].Token
 
 	config.UpdateAuthToken(newToken)
-	logger.Info("Whatsapp token update")
+
+	h.ConfigService.CreateOrUpdate(&models.Config{Token: newToken})
+
 	w.WriteHeader(http.StatusOK)
 	for k, v := range res.Header {
 		w.Header().Set(k, strings.Join(v, ""))
