@@ -1,60 +1,42 @@
 package logger
 
 import (
-	"fmt"
-	"time"
+	"os"
 
-	"github.com/getsentry/sentry-go"
+	"github.com/evalphobia/logrus_sentry"
+	"github.com/sirupsen/logrus"
 	"github.com/weni/whatsapp-router/config"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
-var log *zap.Logger
-
 func init() {
-	var err error
+	logrus.SetOutput(os.Stdout)
+	level, err := logrus.ParseLevel("debug")
+	if err != nil {
+		logrus.Fatalf("Invalid log level '%s'", level)
+	}
+	logrus.SetLevel(level)
 
 	if config.GetConfig().Server.SentryDSN != "" {
-		err = sentry.Init(sentry.ClientOptions{
-			Dsn:              config.GetConfig().Server.SentryDSN,
-			AttachStacktrace: true,
-		})
+		hook, err := logrus_sentry.NewSentryHook(config.GetConfig().Server.SentryDSN, []logrus.Level{logrus.PanicLevel, logrus.FatalLevel, logrus.ErrorLevel})
+		hook.Timeout = 0
+		hook.StacktraceConfiguration.Enable = true
+		hook.StacktraceConfiguration.Skip = 4
+		hook.StacktraceConfiguration.Context = 5
 		if err != nil {
-			log.Fatal(fmt.Sprintf("sentry.Init: %s", err))
+			logrus.Fatalf("invalid sentry DSN: '%s': %s", config.GetConfig().Server.SentryDSN, err)
 		}
-	}
-
-	zconfig := zap.NewProductionConfig()
-	encoderConfig := zap.NewProductionEncoderConfig()
-	encoderConfig.TimeKey = "timestamp"
-	encoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
-	encoderConfig.StacktraceKey = ""
-	zconfig.EncoderConfig = encoderConfig
-
-	log, err = zconfig.Build(
-		zap.AddCallerSkip(1),
-		zap.Hooks(func(entry zapcore.Entry) error {
-			if entry.Level == zapcore.ErrorLevel {
-				defer sentry.Flush(2 * time.Second)
-				sentry.CaptureMessage(fmt.Sprintf("%s, Line No: %d :: %s", entry.Caller.File, entry.Caller.Line, entry.Message))
-			}
-			return nil
-		}),
-	)
-	if err != nil {
-		panic(err)
+		logrus.StandardLogger().Hooks.Add(hook)
 	}
 }
 
-func Info(message string, fields ...zap.Field) {
-	log.Info(message, fields...)
+func Info(message string) {
+	logrus.Info(message)
 }
 
-func Debug(message string, fields ...zap.Field) {
-	log.Debug(message, fields...)
+func Debug(message string) {
+	logrus.Debug(message)
 }
 
-func Error(message string, fields ...zap.Field) {
-	log.Error(message, fields...)
+func Error(message string) {
+	logrus.Error(message)
 }
