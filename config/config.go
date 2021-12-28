@@ -23,43 +23,44 @@ type ServerConfig struct {
 }
 
 type DbConfig struct {
-	Host     string `env:"DB_HOST,required"`
-	Port     int32  `env:"DB_PORT,required"`
-	User     string `env:"DB_USER,required"`
-	Password string `env:"DB_PASSWORD,required"`
-	Name     string `env:"DB_NAME,required"`
-	AppName  string `env:"DB_APP_NAME,required"`
+	Name string `env:"DB_NAME,required"`
+	URI  string `env:"DB_URI,required"`
 }
 
 type WhatsappConfig struct {
-	BaseURL   string `env:"WPP_BASEURL,required"`
-	Username  string `env:"WPP_USERNAME,required"`
-	Password  string `env:"WPP_PASSWORD,required"`
-	AuthToken string `env:"WPP_AUTHTOKEN,required"`
+	BaseURL  string `env:"WPP_BASEURL,required"`
+	Username string `env:"WPP_USERNAME,required"`
+	Password string `env:"WPP_PASSWORD,required"`
 }
 
-var AppConf *Config
+var appConf *Config
+
+var authToken string
 
 func GetConfig() *Config {
-	if AppConf == nil {
+	if appConf == nil {
 		log.Println("loading config")
-		AppConf = &Config{}
+		appConf = &Config{}
 
-		_, hasEnvVars := os.LookupEnv("DB_HOST")
+		_, hasEnvVars := os.LookupEnv("DB_URI")
 		if !hasEnvVars {
 			if err := godotenv.Load("./config/.env"); err != nil {
 				log.Println(fmt.Sprintf("Error loading .env file: %v", err.Error()))
 			}
 		}
 
-		if err := envdecode.Decode(AppConf); err != nil {
+		if err := envdecode.Decode(appConf); err != nil {
 			log.Println(fmt.Sprintf("Failed to decode and load environment variables: %v", err.Error()))
 			os.Exit(1)
 		}
 	}
-	return AppConf
+	return appConf
 }
 
-func UpdateToken(token string) {
-	AppConf.Whatsapp.AuthToken = token
+func GetAuthToken() string {
+	return authToken
+}
+
+func UpdateAuthToken(token string) {
+	authToken = token
 }
