@@ -1,20 +1,29 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
 
+	"github.com/weni/whatsapp-router/config"
 	"github.com/weni/whatsapp-router/logger"
+	"github.com/weni/whatsapp-router/models"
+	"github.com/weni/whatsapp-router/repositories"
 	"github.com/weni/whatsapp-router/servers/grpc"
 	"github.com/weni/whatsapp-router/servers/http"
+	"github.com/weni/whatsapp-router/services"
 	"github.com/weni/whatsapp-router/storage"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 func main() {
 	db := storage.NewDB()
+	defer storage.CloseDB(db)
 	logger.Info("Starting application...")
+
+	initAuthToken(db)
 
 	httpServer := http.NewServer(db)
 	if err := httpServer.Start(); err != nil {
@@ -28,9 +37,38 @@ func main() {
 		os.Exit(1)
 	}
 
-	ch := make(chan os.Signal)
+	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
 	signal := <-ch
 	logger.Info(fmt.Sprintf("WHATSAPP ROUTER STOPING, signal %v", signal))
 
+}
+
+func initAuthToken(db *mongo.Database) {
+	configRepo := repositories.NewConfigRepository(db)
+	configService := services.NewConfigService(configRepo)
+	conf, err := configService.GetConfig()
+	if err != nil {
+		logger.Error(fmt.Sprintf("Error getting config with whatsapp auth token: %s", err))
+		os.Exit(1)
+	}
+	if conf == nil {
+		whatsappService := services.NewWhatsappService()
+		res, err := whatsappService.Login()
+		if err != nil {
+			logger.Error(err.Error())
+			os.Exit(1)
+		}
+		var login services.LoginWhatsapp
+		if err := json.NewDecoder(res.Body).Decode(&login); err != nil {
+			logger.Error(err.Error())
+			os.Exit(1)
+		}
+		conf, err = configService.CreateOrUpdate(&models.Config{Token: login.Users[0].Token})
+		if err != nil {
+			logger.Error(err.Error())
+			os.Exit(1)
+		}
+	}
+	config.UpdateAuthToken(conf.Token)
 }
