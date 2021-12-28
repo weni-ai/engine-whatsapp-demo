@@ -11,10 +11,14 @@ import (
 	"github.com/weni/whatsapp-router/config"
 )
 
-const messagePath = "/v1/messages"
+const (
+	messagePath = "/v1/messages"
+	loginPath   = "/v1/users/login"
+)
 
 type WhatsappService interface {
 	SendMessage([]byte) (http.Header, io.ReadCloser, error)
+	Login() (*http.Response, error)
 }
 
 type DefaultWhatsappService struct {
@@ -36,7 +40,7 @@ func (ws DefaultWhatsappService) SendMessage(body []byte) (http.Header, io.ReadC
 		Header: map[string][]string{
 			"Content-Type":  {"application/json"},
 			"Accept":        {"application/json"},
-			"Authorization": {"Bearer " + wconfig.AuthToken},
+			"Authorization": {"Bearer " + config.GetAuthToken()},
 		},
 		Body: ioutil.NopCloser(bytes.NewReader(body)),
 	}
@@ -50,4 +54,31 @@ func (ws DefaultWhatsappService) SendMessage(body []byte) (http.Header, io.ReadC
 		return nil, nil, errors.New(res.Status)
 	}
 	return res.Header, res.Body, nil
+}
+
+func (ws DefaultWhatsappService) Login() (*http.Response, error) {
+	wconfig := config.GetConfig().Whatsapp
+	httpClient := &http.Client{}
+	reqURL, _ := url.Parse(wconfig.BaseURL + loginPath)
+
+	req := &http.Request{
+		Method: "POST",
+		URL:    reqURL,
+		Header: map[string][]string{},
+		Body:   nil,
+	}
+
+	req.SetBasicAuth(wconfig.Username, wconfig.Password)
+	return httpClient.Do(req)
+}
+
+type LoginWhatsapp struct {
+	Users []struct {
+		Token        string
+		ExpiresAfter string
+	}
+	Meta struct {
+		Version   string
+		ApiStatus string
+	}
 }

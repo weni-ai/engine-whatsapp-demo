@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/weni/whatsapp-router/config"
@@ -54,6 +55,13 @@ func NewTestDB() *mongo.Database {
 
 	db := connection.Database("whatsapp-router-test")
 	return db
+}
+
+func CleanupDB(db *mongo.Database) {
+	err := db.Drop(context.TODO())
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func CloseDB(db *mongo.Database) {
