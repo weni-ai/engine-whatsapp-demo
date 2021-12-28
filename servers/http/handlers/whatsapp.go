@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"net/url"
 	"strings"
 
 	"github.com/weni/whatsapp-router/config"
@@ -123,23 +122,8 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 	fmt.Fprint(w, errors.New("contact not found and token not valid"))
 }
 
-func RefreshToken(w http.ResponseWriter, r *http.Request) {
-	wconfig := config.GetConfig().Whatsapp
-	httpClient := &http.Client{}
-	reqPath := "/v1/users/login"
-
-	reqURL, _ := url.Parse(wconfig.BaseURL + reqPath)
-
-	req := &http.Request{
-		Method: "POST",
-		URL:    reqURL,
-		Header: map[string][]string{},
-		Body:   r.Body,
-	}
-
-	req.SetBasicAuth(config.AppConf.Whatsapp.Username, config.AppConf.Whatsapp.Password)
-
-	res, err := httpClient.Do(req)
+func (h *WhatsappHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
+	res, err := h.WhatsappService.Login()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprint(w, err.Error())
@@ -147,16 +131,7 @@ func RefreshToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var login struct {
-		Users []struct {
-			Token        string
-			ExpiresAfter string
-		}
-		Meta struct {
-			Version   string
-			ApiStatus string
-		}
-	}
+	var login services.LoginWhatsapp
 
 	bdBytes, err := io.ReadAll(res.Body)
 	defer res.Body.Close()
@@ -177,7 +152,7 @@ func RefreshToken(w http.ResponseWriter, r *http.Request) {
 
 	newToken := login.Users[0].Token
 
-	config.UpdateToken(newToken)
+	config.UpdateAuthToken(newToken)
 	logger.Info("Whatsapp token update")
 	w.WriteHeader(http.StatusOK)
 	for k, v := range res.Header {
