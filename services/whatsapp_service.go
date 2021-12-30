@@ -14,11 +14,13 @@ import (
 const (
 	messagePath = "/v1/messages"
 	loginPath   = "/v1/users/login"
+	healthPath  = "/v1/health"
 )
 
 type WhatsappService interface {
 	SendMessage([]byte) (http.Header, io.ReadCloser, error)
 	Login() (*http.Response, error)
+	Health() (*http.Response, error)
 }
 
 type DefaultWhatsappService struct {
@@ -69,6 +71,24 @@ func (ws DefaultWhatsappService) Login() (*http.Response, error) {
 	}
 
 	req.SetBasicAuth(wconfig.Username, wconfig.Password)
+	return httpClient.Do(req)
+}
+
+func (ws DefaultWhatsappService) Health() (*http.Response, error) {
+	wconfig := config.GetConfig().Whatsapp
+	httpClient := &http.Client{}
+	reqURL, _ := url.Parse(wconfig.BaseURL + healthPath)
+
+	req := &http.Request{
+		Method: "GET",
+		URL:    reqURL,
+		Header: map[string][]string{
+			"Content-Type":  {"application/json"},
+			"Accept":        {"application/json"},
+			"Authorization": {"Bearer " + config.GetAuthToken()},
+		},
+		Body: nil,
+	}
 	return httpClient.Do(req)
 }
 

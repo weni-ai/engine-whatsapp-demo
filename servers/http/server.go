@@ -77,6 +77,7 @@ func NewRouter(s *Server) *chi.Mux {
 	router.Route("/v1", func(r chi.Router) {
 		r.Post("/messages", courierHandler.HandleSendMessage)
 		r.Post("/users/login", whatsappHandler.RefreshToken)
+		r.Get("/health", whatsappHandler.HandleHealth)
 		r.Patch("/settings/application", func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		})

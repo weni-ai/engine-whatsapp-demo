@@ -189,14 +189,8 @@ func TestRefreshToken(t *testing.T) {
 	loginBody := `{"users":[{"token":"eyJhbGciOiAiSFMyNTYiLCAidHlwIjogIkpXVCJ9.eyJ1c2VyIjoiQWRtaW4iLCJpYXQiOjE2NDAxODIzMjIsImV4cCI6MTY0MDc4NzEyMiwid2E6cmFuZCI6ImVkMWU5OGU4ZjA4NmIxMDQzNDBlM2MxMGFjNGU3YzY3In0.2pEh32jyfBLUjxWNklEtgOrZqy7TgGj48y5pVTgl7FU","expires_after":"2021-12-29 14:12:02+00:00"}],"meta":{"version":"v2.37.1","api_status":"stable"}}`
 	mockWhatsappService.EXPECT().Login().Return(
 		&http.Response{
-			Header: http.Header{
-				"content-type": {"application/json"},
-			},
-			Body: ioutil.NopCloser(bytes.NewReader(
-				[]byte(
-					loginBody,
-				),
-			)),
+			Header:     http.Header{"content-type": {"application/json"}},
+			Body:       ioutil.NopCloser(bytes.NewReader([]byte(loginBody))),
 			StatusCode: 200,
 		},
 		nil,
@@ -221,6 +215,56 @@ func TestRefreshToken(t *testing.T) {
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, request)
 	assert.Equal(t, response.Code, 200)
+}
+
+func TestHandleHealth(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	healthBody := `{
+		"health": {
+			"192.168.11.206:wamaster-foobar-6bdc9bcc78-42vlm": {
+				"gateway_status": "connected",
+				"role": "primary_master"
+			},
+			"192.168.50.212:wacore-foobar-6d9d96959c-zzddg": {
+				"gateway_status": "connected",
+				"role": "coreapp"
+			},
+			"192.168.65.190:wacore-foobar-6d9d96959c-ddg5r": {
+				"gateway_status": "connected",
+				"role": "coreapp"
+			}
+		},
+		"meta": {
+			"version": "v2.37.1",
+			"api_status": "stable"
+		}
+	}`
+
+	mockWhatsappService := mocks.NewMockWhatsappService(ctrl)
+	mockWhatsappService.EXPECT().Health().Return(
+		&http.Response{
+			Header:     http.Header{},
+			Body:       ioutil.NopCloser(bytes.NewReader([]byte(healthBody))),
+			StatusCode: 200,
+		},
+		nil,
+	)
+
+	wh := WhatsappHandler{
+		WhatsappService: mockWhatsappService,
+	}
+	router := chi.NewRouter()
+	router.Get("/v1/health", wh.HandleHealth)
+	request, _ := http.NewRequest(
+		http.MethodGet,
+		"/v1/health",
+		nil,
+	)
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	assert.Equal(t, 200, response.Code)
 }
 
 var helloMsg = `{

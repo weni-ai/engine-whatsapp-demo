@@ -35,6 +35,21 @@ func (m *MockWhatsappService) EXPECT() *MockWhatsappServiceMockRecorder {
 	return m.recorder
 }
 
+// Health mocks base method.
+func (m *MockWhatsappService) Health() (*http.Response, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Health")
+	ret0, _ := ret[0].(*http.Response)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Health indicates an expected call of Health.
+func (mr *MockWhatsappServiceMockRecorder) Health() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Health", reflect.TypeOf((*MockWhatsappService)(nil).Health))
+}
+
 // Login mocks base method.
 func (m *MockWhatsappService) Login() (*http.Response, error) {
 	m.ctrl.T.Helper()

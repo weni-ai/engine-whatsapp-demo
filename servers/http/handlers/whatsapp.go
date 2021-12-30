@@ -187,6 +187,20 @@ func (h *WhatsappHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, bdString)
 }
 
+func (h *WhatsappHandler) HandleHealth(w http.ResponseWriter, r *http.Request) {
+	res, err := h.WhatsappService.Health()
+	if err != nil {
+		logger.Error(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	for k, v := range res.Header {
+		w.Header().Set(k, strings.Join(v, ""))
+	}
+	w.WriteHeader(http.StatusOK)
+	io.Copy(w, res.Body)
+}
+
 func (h *WhatsappHandler) sendTokenConfirmation(contact *models.Contact) (http.Header, io.ReadCloser, error) {
 	urn := contact.URN
 	payload := fmt.Sprintf(
