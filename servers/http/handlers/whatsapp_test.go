@@ -18,127 +18,115 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+var testCases = []struct {
+	Label  string
+	Data   string
+	Status int
+}{
+	{Label: "Receive Valid Text Message", Data: helloMsg, Status: 200},
+	{Label: "Receive Valid Audio Message", Data: audioMsg, Status: 200},
+	{Label: "Receive Valid Button Message", Data: buttonMsg, Status: 200},
+	{Label: "Receive Valid Document Message", Data: documentMsg, Status: 200},
+	{Label: "Receive Valid Image Message", Data: imageMsg, Status: 200},
+	{Label: "Receive Valid Location Message", Data: locationMsg, Status: 200},
+	{Label: "Receive Valid Video Message", Data: videoMsg, Status: 200},
+	{Label: "Receive Valid Voice Message", Data: voiceMsg, Status: 200},
+	{Label: "Receive Valid Contact Message", Data: contactMsg, Status: 200},
+}
+
+var channelID = primitive.NewObjectID()
+
+var dummyChannel = &models.Channel{
+	ID:    channelID,
+	UUID:  "21ee95f6-3776-4b1e-aabc-742eb5dc9170",
+	Name:  "local test",
+	Token: "weni-demo-44a2m17t0x",
+}
+var dummyChannel2 = &models.Channel{
+	ID:    primitive.NewObjectID(),
+	UUID:  "21ee95f6-3776-4b1e-aabc-742eb5dc9170",
+	Name:  "local test",
+	Token: "weni-demo-1234567890",
+}
+
+var dummyContact = &models.Contact{
+	URN:     "5582988887777",
+	Name:    "Dummy",
+	Channel: dummyChannel.ID,
+}
+
+var incomingDummyContact = &models.Contact{
+	URN:  "5582988887777",
+	Name: "Dummy",
+}
+
 func TestContactTokenConfirmation(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
+
+	payload := fmt.Sprintf(
+		`{"to":"%s","type":"text","text":{"body":"%s"}}`,
+		dummyContact.URN,
+		confirmationMessage,
+	)
+	incomingRequest := `{"contacts":[{"profile":{"name":"Dummy"},"wa_id":"12341341234"}],"messages":[{"from":"5582988887777","id":"123456","text":{"body":"weni-demo-44a2m17t0x"},"timestamp":"623123123123","type":"text"}]}`
 
 	mockChannelService := mocks.NewMockChannelService(ctrl)
 	mockContactService := mocks.NewMockContactService(ctrl)
 	mockCourierService := mocks.NewMockCourierService(ctrl)
 	mockWhatsappService := mocks.NewMockWhatsappService(ctrl)
 	mockConfigService := mocks.NewMockConfigService(ctrl)
-
-	channelID := primitive.NewObjectID()
-
-	dummyChannel := &models.Channel{
-		ID:    channelID,
-		UUID:  "21ee95f6-3776-4b1e-aabc-742eb5dc9170",
-		Name:  "local test",
-		Token: "weni-demo-44a2m17t0x",
-	}
-	mockChannelService.EXPECT().FindChannelByToken("weni-demo-44a2m17t0x").Return(
-		dummyChannel,
-		nil,
-	)
-	dummyContact := &models.Contact{
-		URN:     "5582988887777",
-		Name:    "Dummy",
-		Channel: primitive.NilObjectID,
-	}
-
-	newDummyContact := &models.Contact{
-		URN:     "5582988887777",
-		Name:    "Dummy",
-		Channel: channelID,
-	}
-
-	urn := newDummyContact.URN
-	payload := fmt.Sprintf(
-		`{"to":"%s","type":"text","text":{"body":"%s"}}`,
-		urn,
-		confirmationMessage,
-	)
-	dummyPayloadBytes := []byte(payload)
-
-	mockContactService.EXPECT().FindContact(dummyContact).Return(nil, errors.New("contact not found"))
-	mockContactService.EXPECT().CreateContact(newDummyContact).Return(newDummyContact, nil)
-	mockWhatsappService.EXPECT().SendMessage(dummyPayloadBytes).Return(
-		http.Header{
-			"content-type": {"application/json"},
-		},
+	mockChannelService.EXPECT().FindChannelByToken(dummyChannel.Token).Return(dummyChannel, nil)
+	mockContactService.EXPECT().FindContact(incomingDummyContact).Return(nil, errors.New("contact not found"))
+	mockContactService.EXPECT().CreateContact(dummyContact).Return(dummyContact, nil)
+	mockWhatsappService.EXPECT().SendMessage([]byte(payload)).Return(
+		http.Header{"content-type": {"application/json"}},
 		ioutil.NopCloser(bytes.NewReader([]byte(`{"messages":{"id":"gBEGVYKZRIIyAgmiTgezkroUL2Q"}],"meta":{"api_status":"stable","version":"2.35.2"}}`))),
 		nil,
 	)
 
 	wh := WhatsappHandler{mockContactService, mockChannelService, mockCourierService, mockWhatsappService, mockConfigService}
-
 	router := chi.NewRouter()
 	router.Post("/wr/receive/", wh.HandleIncomingRequests)
-
 	request, _ := http.NewRequest(
 		http.MethodPost,
 		"/wr/receive/",
-		strings.NewReader(
-			`{"contacts":[{"profile":{"name":"Dummy"},"wa_id":"12341341234"}],"messages":[{"from":"5582988887777","id":"123456","text":{"body":"weni-demo-44a2m17t0x"},"timestamp":"623123123123","type":"text"}]}`))
+		strings.NewReader(incomingRequest))
 	response := httptest.NewRecorder()
-
 	router.ServeHTTP(response, request)
-
 	assert.Equal(t, response.Code, 200)
 }
 
-func TestSendMessage(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+func TestHandleIncomingRequest(t *testing.T) {
+	for _, tc := range testCases {
+		t.Run(tc.Label, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
 
-	mockChannelService := mocks.NewMockChannelService(ctrl)
-	mockContactService := mocks.NewMockContactService(ctrl)
-	mockCourierService := mocks.NewMockCourierService(ctrl)
-	mockWhatsappService := mocks.NewMockWhatsappService(ctrl)
-	mockConfigService := mocks.NewMockConfigService(ctrl)
+			mockChannelService := mocks.NewMockChannelService(ctrl)
+			mockContactService := mocks.NewMockContactService(ctrl)
+			mockCourierService := mocks.NewMockCourierService(ctrl)
+			mockWhatsappService := mocks.NewMockWhatsappService(ctrl)
+			mockConfigService := mocks.NewMockConfigService(ctrl)
 
-	channelID := primitive.NewObjectID()
+			mockContactService.EXPECT().FindContact(incomingDummyContact).Return(dummyContact, nil)
+			mockChannelService.EXPECT().FindChannelById(channelID.Hex()).Return(dummyChannel, nil)
+			mockCourierService.EXPECT().RedirectMessage(dummyChannel.UUID, tc.Data).Return(tc.Status, nil)
 
-	dummyChannel := &models.Channel{
-		ID:    channelID,
-		UUID:  "21ee95f6-3776-4b1e-aabc-742eb5dc9170",
-		Name:  "local test",
-		Token: "weni-44a2m17t0x",
+			wh := WhatsappHandler{mockContactService, mockChannelService, mockCourierService, mockWhatsappService, mockConfigService}
+			router := chi.NewRouter()
+			router.Post("/wr/receive/", wh.HandleIncomingRequests)
+			request, _ := http.NewRequest(
+				http.MethodPost,
+				"/wr/receive/",
+				strings.NewReader(tc.Data),
+			)
+			response := httptest.NewRecorder()
+			router.ServeHTTP(response, request)
+			assert.Equal(t, response.Code, tc.Status)
+
+			ctrl.Finish()
+		})
 	}
-
-	incomingDummyContact := &models.Contact{
-		URN:  "5582988887777",
-		Name: "Dummy",
-	}
-
-	dummyContact := &models.Contact{
-		URN:     "5582988887777",
-		Name:    "Dummy",
-		Channel: dummyChannel.ID,
-	}
-
-	incomingRequest := `{"contacts":[{"profile":{"name":"Dummy"},"wa_id":"12341341234"}],"messages":[{"from":"5582988887777","id":"123456","text":{"body":"hello"},"timestamp":"623123123123","type":"text"}]}`
-
-	mockContactService.EXPECT().FindContact(incomingDummyContact).Return(dummyContact, nil)
-	mockChannelService.EXPECT().FindChannelById(channelID.Hex()).Return(dummyChannel, nil)
-	mockCourierService.EXPECT().RedirectMessage(dummyChannel.UUID, incomingRequest).Return(http.StatusOK, nil)
-
-	wh := WhatsappHandler{mockContactService, mockChannelService, mockCourierService, mockWhatsappService, mockConfigService}
-
-	router := chi.NewRouter()
-	router.Post("/wr/receive/", wh.HandleIncomingRequests)
-
-	request, _ := http.NewRequest(
-		http.MethodPost,
-		"/wr/receive/",
-		strings.NewReader(incomingRequest),
-	)
-
-	response := httptest.NewRecorder()
-
-	router.ServeHTTP(response, request)
-
-	assert.Equal(t, response.Code, 200)
 }
 
 func TestContactTokenUpdate(t *testing.T) {
@@ -151,50 +139,23 @@ func TestContactTokenUpdate(t *testing.T) {
 	mockWhatsappService := mocks.NewMockWhatsappService(ctrl)
 	mockConfigService := mocks.NewMockConfigService(ctrl)
 
-	dummyChannel := &models.Channel{
-		ID:    primitive.NewObjectID(),
-		UUID:  "21ee95f6-3776-4b1e-aabc-742eb5dc9170",
-		Name:  "local test",
-		Token: "weni-demo-44a2m17t0x",
-	}
-
-	dummyChannel2 := &models.Channel{
-		ID:    primitive.NewObjectID(),
-		UUID:  "21ee95f6-3776-4b1e-aabc-742eb5dc9170",
-		Name:  "local test",
-		Token: "weni-demo-1234567890",
-	}
-
-	incomingDummyContact := &models.Contact{
-		URN:  "5582988887777",
-		Name: "Dummy",
-	}
-
-	dummyContact := &models.Contact{
-		URN:     "5582988887777",
-		Name:    "Dummy",
-		Channel: dummyChannel.ID,
-	}
-
 	dummyUpdatedContact := &models.Contact{
 		URN:     "5582988887777",
 		Name:    "Dummy",
 		Channel: dummyChannel2.ID,
 	}
 
-	urn := dummyContact.URN
 	payload := fmt.Sprintf(
 		`{"to":"%s","type":"text","text":{"body":"%s"}}`,
-		urn,
+		dummyContact.URN,
 		confirmationMessage,
 	)
-	dummyPayloadBytes := []byte(payload)
 
 	incomingRequest := `{"contacts":[{"profile":{"name":"Dummy"},"wa_id":"12341341234"}],"messages":[{"from":"5582988887777","id":"123456","text":{"body":"weni-demo-1234567890"},"timestamp":"623123123123","type":"text"}]}`
 	mockContactService.EXPECT().FindContact(incomingDummyContact).Return(dummyContact, nil)
 	mockContactService.EXPECT().UpdateContact(dummyContact).Return(dummyUpdatedContact, nil)
-	mockChannelService.EXPECT().FindChannelByToken(extractTextMessage(incomingRequest)).Return(dummyChannel2, nil)
-	mockWhatsappService.EXPECT().SendMessage(dummyPayloadBytes).Return(
+	mockChannelService.EXPECT().FindChannelByToken(dummyChannel2.Token).Return(dummyChannel2, nil)
+	mockWhatsappService.EXPECT().SendMessage([]byte(payload)).Return(
 		http.Header{
 			"content-type": {"application/json"},
 		},
@@ -203,20 +164,15 @@ func TestContactTokenUpdate(t *testing.T) {
 	)
 
 	wh := WhatsappHandler{mockContactService, mockChannelService, mockCourierService, mockWhatsappService, mockConfigService}
-
 	router := chi.NewRouter()
 	router.Post("/wr/receive/", wh.HandleIncomingRequests)
-
 	request, _ := http.NewRequest(
 		http.MethodPost,
 		"/wr/receive/",
 		strings.NewReader(incomingRequest),
 	)
-
 	response := httptest.NewRecorder()
-
 	router.ServeHTTP(response, request)
-
 	assert.Equal(t, response.Code, 200)
 }
 
@@ -249,13 +205,11 @@ func TestRefreshToken(t *testing.T) {
 	conf := &models.Config{
 		Token: "eyJhbGciOiAiSFMyNTYiLCAidHlwIjogIkpXVCJ9.eyJ1c2VyIjoiQWRtaW4iLCJpYXQiOjE2NDAxODIzMjIsImV4cCI6MTY0MDc4NzEyMiwid2E6cmFuZCI6ImVkMWU5OGU4ZjA4NmIxMDQzNDBlM2MxMGFjNGU3YzY3In0.2pEh32jyfBLUjxWNklEtgOrZqy7TgGj48y5pVTgl7FU",
 	}
-
 	mockConfigService.EXPECT().CreateOrUpdate(
 		conf,
 	).Return(conf, nil)
 
 	wh := WhatsappHandler{mockContactService, mockChannelService, mockCourierService, mockWhatsappService, mockConfigService}
-
 	router := chi.NewRouter()
 	testRoute := "/v1/users/login"
 	router.Post(testRoute, wh.RefreshToken)
@@ -264,8 +218,217 @@ func TestRefreshToken(t *testing.T) {
 		testRoute,
 		nil,
 	)
-
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, request)
 	assert.Equal(t, response.Code, 200)
 }
+
+var helloMsg = `{
+	"contacts":[{
+		"profile": {
+			"name": "Dummy"
+		},
+		"wa_id": "5582988887777"
+	}],
+  "messages": [{
+    "from": "5582988887777",
+    "id": "41",
+    "timestamp": "1454119029",
+    "text": {
+      "body": "hello world"
+    },
+    "type": "text"
+   }]
+}`
+
+var audioMsg = `{
+	"contacts":[{
+		"profile": {
+			"name": "Dummy"
+		},
+		"wa_id": "5582988887777"
+	}],
+	"messages": [{
+		"from": "5582988887777",
+		"id": "41",
+		"timestamp": "1454119029",
+		"type": "audio",
+		"audio": {
+			"file": "/path/to/v1/media/41",
+			"id": "41",
+			"link": "https://example.org/v1/media/41",
+			"mime_type": "text/plain",
+			"sha256": "the-sha-signature"
+		}
+	}]
+}`
+
+var buttonMsg = `{
+	"contacts":[{
+		"profile": {
+			"name": "Dummy"
+		},
+		"wa_id": "5582988887777"
+	}],
+	"messages": [{
+		"from": "5582988887777",
+		"id": "41",
+		"timestamp": "1454119029",
+		"type": "button",
+		"button": {
+			"payload": null,
+			"text": "BUTTON1"
+		}
+	}]
+}`
+
+var documentMsg = `{
+	"contacts":[{
+		"profile": {
+			"name": "Dummy"
+		},
+		"wa_id": "5582988887777"
+	}],
+	"messages": [{
+		"from": "5582988887777",
+		"id": "41",
+		"timestamp": "1454119029",
+		"type": "document",
+		"document": {
+			"file": "/path/to/v1/media/41",
+			"id": "41",
+			"link": "https://example.org/v1/media/41",
+			"mime_type": "text/plain",
+			"sha256": "the-sha-signature",
+			"caption": "the caption",
+			"filename": "filename.type"
+		}
+	}]
+}`
+
+var imageMsg = `{
+	"contacts":[{
+		"profile": {
+			"name": "Dummy"
+		},
+		"wa_id": "5582988887777"
+	}],
+	"messages": [{
+		"from": "5582988887777",
+		"id": "41",
+		"timestamp": "1454119029",
+		"type": "image",
+		"image": {
+			"file": "/path/to/v1/media/41",
+			"id": "41",
+			"link": "https://example.org/v1/media/41",
+			"mime_type": "text/plain",
+			"sha256": "the-sha-signature",
+			"caption": "the caption"
+		}
+	}]
+}`
+
+var locationMsg = `{
+	"contacts":[{
+		"profile": {
+			"name": "Dummy"
+		},
+		"wa_id": "5582988887777"
+	}],
+	"messages": [{
+		"from": "5582988887777",
+		"id": "41",
+		"timestamp": "1454119029",
+		"type": "location",
+		"location": {
+			"address": "some address",
+			"latitude": 0.00,
+			"longitude": 1.00,
+			"name": "some name",
+			"url": "https://example.org/"
+		}
+	}]
+}`
+
+var videoMsg = `{
+	"contacts":[{
+		"profile": {
+			"name": "Dummy"
+		},
+		"wa_id": "5582988887777"
+	}],
+	"messages": [{
+		"from": "5582988887777",
+		"id": "41",
+		"timestamp": "1454119029",
+		"type": "video",
+		"video": {
+			"file": "/path/to/v1/media/41",
+			"id": "41",
+			"link": "https://example.org/v1/media/41",
+			"mime_type": "text/plain",
+			"sha256": "the-sha-signature"
+		}
+	}]
+}`
+
+var voiceMsg = `{
+	"contacts":[{
+		"profile": {
+			"name": "Dummy"
+		},
+		"wa_id": "5582988887777"
+	}],
+	"messages": [{
+		"from": "5582988887777",
+		"id": "41",
+		"timestamp": "1454119029",
+		"type": "voice",
+		"voice": {
+			"file": "/path/to/v1/media/41",
+			"id": "41",
+			"link": "https://example.org/v1/media/41",
+			"mime_type": "text/plain",
+			"sha256": "the-sha-signature"
+		}
+	}]
+}`
+
+var contactMsg = `{
+	"contacts":[{
+		"profile": {
+			"name": "Dummy"
+		},
+		"wa_id": "5582988887777"
+	}],
+	"messages": [{
+		"from": "5582988887777",
+		"id": "41",
+		"timestamp": "1454119029",
+		"type": "contacts",
+		"contacts": [{
+			"addresses": [],
+			"emails": [],
+			"ims": [],
+			"name": {
+				"first_name": "John Cruz",
+				"formatted_name": "John Cruz"
+			},
+			"org": {},
+			"phones": [
+				{
+					"phone": "+1 415-858-6273",
+					"type": "CELL",
+					"wa_id": "14158586273"
+				},
+				{
+					"phone": "+1 415-858-6274",
+					"type": "CELL",
+					"wa_id": "14158586274"
+				}
+			],
+			"urls": []
+		}]
+	}]
+}`

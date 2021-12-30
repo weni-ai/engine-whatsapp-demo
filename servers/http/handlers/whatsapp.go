@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -28,21 +29,27 @@ type WhatsappHandler struct {
 }
 
 func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.Request) {
-	incomingMsg, err := ioutil.ReadAll(r.Body)
+
+	incomingWebhookEvent, err := ioutil.ReadAll(io.LimitReader(r.Body, 1000000))
+	r.Body = ioutil.NopCloser(bytes.NewBuffer(incomingWebhookEvent))
 	if err != nil {
-		logger.Error("unexpected server error - " + err.Error())
+		logger.Error(fmt.Sprintf("unable to read request body: %s", err))
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprint(w, err.Error())
 		return
 	}
 
-	incomingContact := parseToContact(string(incomingMsg))
-	if incomingContact == nil {
-		err := errors.New("request without being from a contact")
-		logger.Debug(fmt.Sprintf("%v: %v", err.Error(), string(incomingMsg)))
+	payload := &eventPayload{}
+	if err = json.Unmarshal(incomingWebhookEvent, &payload); err != nil {
+		logger.Error(fmt.Sprintf("unable to parse request body: %s", err))
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprint(w, err.Error())
 		return
+	}
+
+	incomingContact := &models.Contact{
+		URN:  payload.Messages[0].From,
+		Name: payload.Contacts[0].Profile.Name,
 	}
 
 	contact, err := h.ContactService.FindContact(incomingContact)
@@ -50,73 +57,75 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 		logger.Debug(err.Error())
 	}
 
-	textMessage := extractTextMessage(string(incomingMsg))
+	textMessage := ""
+	if payload.Messages[0].Type == "text" {
+		textMessage = payload.Messages[0].Text.Body
+	}
 
-	if textMessage != "" {
-		if strings.Contains(textMessage, tokenPrefix) {
-			channelFromToken, err := h.ChannelService.FindChannelByToken(textMessage)
+	if textMessage != "" && strings.Contains(textMessage, tokenPrefix) {
+		channelFromToken, err := h.ChannelService.FindChannelByToken(textMessage)
+		if err != nil {
+			logger.Debug(err.Error())
+		}
+		if channelFromToken != nil {
+			incomingContact.Channel = channelFromToken.ID
+			if contact != nil {
+				contact.Channel = channelFromToken.ID
+				_, err = h.ContactService.UpdateContact(contact)
+				if err != nil {
+					logger.Error(err.Error())
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+				_, b, err := h.sendTokenConfirmation(contact)
+				if err != nil {
+					logger.Error(err.Error())
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				} else {
+					body, _ := ioutil.ReadAll(b)
+					logger.Debug(string(body))
+					w.WriteHeader(http.StatusOK)
+					return
+				}
+			} else {
+				_, err := h.ContactService.CreateContact(incomingContact)
+				if err != nil {
+					logger.Error(err.Error())
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+				_, b, err := h.sendTokenConfirmation(incomingContact)
+				if err != nil {
+					logger.Error(err.Error())
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+				} else {
+					body, _ := ioutil.ReadAll(b)
+					logger.Debug(string(body))
+					w.WriteHeader(http.StatusOK)
+					return
+				}
+			}
+		}
+	} else {
+		if contact != nil {
+			channelId := contact.Channel.Hex()
+			channel, err := h.ChannelService.FindChannelById(channelId)
 			if err != nil {
 				logger.Debug(err.Error())
 			}
-			if channelFromToken != nil {
-				incomingContact.Channel = channelFromToken.ID
-				if contact != nil {
-					contact.Channel = channelFromToken.ID
-					_, err = h.ContactService.UpdateContact(contact)
-					if err != nil {
-						logger.Error(err.Error())
-						http.Error(w, err.Error(), http.StatusInternalServerError)
-						return
-					}
-					_, b, err := h.sendTokenConfirmation(contact)
-					if err != nil {
-						logger.Error(err.Error())
-						w.WriteHeader(http.StatusInternalServerError)
-						return
-					} else {
-						body, _ := ioutil.ReadAll(b)
-						logger.Debug(string(body))
-						w.WriteHeader(http.StatusOK)
-						return
-					}
-				} else {
-					_, err := h.ContactService.CreateContact(incomingContact)
-					if err != nil {
-						logger.Error(err.Error())
-						http.Error(w, err.Error(), http.StatusInternalServerError)
-						return
-					}
-					_, b, err := h.sendTokenConfirmation(incomingContact)
-					if err != nil {
-						logger.Error(err.Error())
-						http.Error(w, err.Error(), http.StatusInternalServerError)
-					} else {
-						body, _ := ioutil.ReadAll(b)
-						logger.Debug(string(body))
-						w.WriteHeader(http.StatusOK)
-						return
-					}
-				}
-			}
-		} else {
-			if contact != nil {
-				channelId := contact.Channel.Hex()
-				channel, err := h.ChannelService.FindChannelById(channelId)
+			if channel != nil {
+				channelUUID := channel.UUID
+				status, err := h.CourierService.RedirectMessage(channelUUID, string(incomingWebhookEvent))
 				if err != nil {
 					logger.Debug(err.Error())
-				}
-				if channel != nil {
-					channelUUID := channel.UUID
-					status, err := h.CourierService.RedirectMessage(channelUUID, string(incomingMsg))
-					if err != nil {
-						logger.Debug(err.Error())
-						w.WriteHeader(status)
-						fmt.Fprint(w, err)
-					}
+					w.WriteHeader(status)
+					fmt.Fprint(w, err)
 				}
 			}
 		}
 	}
+
 	//returning status ok to avoid retry send mechanisms if contact not exists or token is not valid
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprint(w, errors.New("contact not found and token not valid"))
@@ -181,41 +190,20 @@ func (h *WhatsappHandler) sendTokenConfirmation(contact *models.Contact) (http.H
 	return h.WhatsappService.SendMessage(payloadBytes)
 }
 
-func parseToContact(m string) *models.Contact {
-	name := extractName(m)
-	number := extractNumber(m)
-	if name != "" && number != "" {
-		return &models.Contact{
-			URN:  number,
-			Name: name,
-		}
+type eventPayload struct {
+	Contacts []struct {
+		Profile struct {
+			Name string `json:"name"`
+		} `json:"profile"`
+		WaID string `json:"wa_id"`
+	} `json:"contacts"`
+	Messages []struct {
+		From      string `json:"from"      validate:"required"`
+		ID        string `json:"id"        validate:"required"`
+		Timestamp string `json:"timestamp" validate:"required"`
+		Type      string `json:"type"      validate:"required"`
+		Text      struct {
+			Body string `json:"body"`
+		} `json:"text"`
 	}
-	return nil
-}
-
-func extractName(m string) string {
-	var result map[string][]map[string]map[string]interface{}
-	json.Unmarshal([]byte(m), &result)
-	if result["contacts"] != nil {
-		return result["contacts"][0]["profile"]["name"].(string)
-	}
-	return ""
-}
-
-func extractNumber(m string) string {
-	var result map[string][]map[string]interface{}
-	json.Unmarshal([]byte(m), &result)
-	if result["messages"] != nil {
-		return result["messages"][0]["from"].(string)
-	}
-	return ""
-}
-
-func extractTextMessage(m string) string {
-	var result map[string][]map[string]map[string]interface{}
-	json.Unmarshal([]byte(m), &result)
-	if result["messages"] != nil {
-		return result["messages"][0]["text"]["body"].(string)
-	}
-	return ""
 }
