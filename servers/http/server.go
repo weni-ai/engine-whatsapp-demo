@@ -67,6 +67,8 @@ func NewRouter(s *Server) *chi.Mux {
 		WhatsappService: services.NewWhatsappService(),
 	}
 
+	router.Use(logger.MiddlewareLogger)
+
 	router.Route("/wr/", func(r chi.Router) {
 		r.Use(ContentTypeJson)
 		r.Route("/receive", func(r chi.Router) {

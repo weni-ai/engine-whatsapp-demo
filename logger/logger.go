@@ -1,9 +1,13 @@
 package logger
 
 import (
+	"fmt"
+	"net/http"
 	"os"
+	"time"
 
 	"github.com/evalphobia/logrus_sentry"
+	"github.com/go-chi/chi/middleware"
 	"github.com/sirupsen/logrus"
 	"github.com/weni/whatsapp-router/config"
 )
@@ -39,4 +43,32 @@ func Debug(message string) {
 
 func Error(message string) {
 	logrus.Error(message)
+}
+
+func MiddlewareLogger(next http.Handler) http.Handler {
+	fn := func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		var requestID string
+		if reqID := r.Context().Value(middleware.RequestIDKey); reqID != nil {
+			requestID = reqID.(string)
+		}
+		ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
+		next.ServeHTTP(ww, r)
+
+		latency := time.Since(start)
+
+		fields := logrus.Fields{
+			"status":                              ww.Status(),
+			"took":                                latency,
+			fmt.Sprintf("measure#%s.latency", ""): latency.Nanoseconds(),
+			"remote":                              r.RemoteAddr,
+			"request":                             r.RequestURI,
+			"method":                              r.Method,
+		}
+		if requestID != "" {
+			fields["request-id"] = requestID
+		}
+		logrus.WithFields(fields).Info("request completed")
+	}
+	return http.HandlerFunc(fn)
 }
