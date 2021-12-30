@@ -10,7 +10,7 @@ import (
 
 func init() {
 	logrus.SetOutput(os.Stdout)
-	level, err := logrus.ParseLevel("debug")
+	level, err := logrus.ParseLevel(config.GetConfig().Server.LogLevel)
 	if err != nil {
 		logrus.Fatalf("Invalid log level '%s'", level)
 	}
