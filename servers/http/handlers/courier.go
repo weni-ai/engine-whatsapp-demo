@@ -30,6 +30,7 @@ func (c *CourierHandler) HandleSendMessage(w http.ResponseWriter, r *http.Reques
 	for k, v := range header {
 		w.Header().Set(k, strings.Join(v, ""))
 	}
+	b, _ := ioutil.ReadAll(body)
 	w.WriteHeader(http.StatusCreated)
-	fmt.Fprint(w, body)
+	w.Write(b)
 }

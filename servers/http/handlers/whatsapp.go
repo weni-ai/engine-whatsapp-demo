@@ -47,9 +47,18 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 		return
 	}
 
+	if len(payload.Messages) <= 0 {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	cName := ""
+	if len(payload.Contacts) > 0 {
+		cName = payload.Contacts[0].Profile.Name
+	}
 	incomingContact := &models.Contact{
 		URN:  payload.Messages[0].From,
-		Name: payload.Contacts[0].Profile.Name,
+		Name: cName,
 	}
 
 	contact, err := h.ContactService.FindContact(incomingContact)
