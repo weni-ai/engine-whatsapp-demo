@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/go-chi/chi"
 	"github.com/weni/whatsapp-router/config"
 	"github.com/weni/whatsapp-router/logger"
 	"github.com/weni/whatsapp-router/models"
@@ -189,6 +190,21 @@ func (h *WhatsappHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 
 func (h *WhatsappHandler) HandleHealth(w http.ResponseWriter, r *http.Request) {
 	res, err := h.WhatsappService.Health()
+	if err != nil {
+		logger.Error(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	for k, v := range res.Header {
+		w.Header().Set(k, strings.Join(v, ""))
+	}
+	w.WriteHeader(http.StatusOK)
+	io.Copy(w, res.Body)
+}
+
+func (h *WhatsappHandler) HandleGetMedia(w http.ResponseWriter, r *http.Request) {
+	mediaID := chi.URLParam(r, "mediaID")
+	res, err := h.WhatsappService.GetMedia(mediaID)
 	if err != nil {
 		logger.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)

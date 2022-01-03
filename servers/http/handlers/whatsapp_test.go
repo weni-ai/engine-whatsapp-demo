@@ -267,6 +267,34 @@ func TestHandleHealth(t *testing.T) {
 	assert.Equal(t, 200, response.Code)
 }
 
+func TestHandleGetMedia(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mediaID := "123456-qwerty-asdfgh-zxcvb"
+	mockWhatsappService := mocks.NewMockWhatsappService(ctrl)
+	mockWhatsappService.EXPECT().GetMedia(mediaID).Return(
+		&http.Response{
+			Header:     http.Header{},
+			Body:       ioutil.NopCloser(bytes.NewReader([]byte(""))),
+			StatusCode: 200,
+		},
+		nil,
+	)
+
+	wh := WhatsappHandler{WhatsappService: mockWhatsappService}
+	router := chi.NewRouter()
+	router.Get("/v1/media/{mediaID}", wh.HandleGetMedia)
+	request, _ := http.NewRequest(
+		http.MethodGet,
+		"/v1/media/"+mediaID,
+		nil,
+	)
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	assert.Equal(t, 200, response.Code)
+}
+
 var helloMsg = `{
 	"contacts":[{
 		"profile": {
