@@ -36,7 +36,7 @@ func (s *Server) Start() error {
 	pb.RegisterChannelServiceServer(s.grpcServer, channelService)
 	reflection.Register(s.grpcServer)
 
-	address := fmt.Sprintf("0.0.0.0:%d", s.config.Server.GRPCPort)
+	address := fmt.Sprintf("0.0.0.0:%d", s.config.App.GRPCPort)
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
 		logger.Error(err.Error())
@@ -44,7 +44,7 @@ func (s *Server) Start() error {
 		return err
 	}
 
-	logger.Info(fmt.Sprintf("Start grpc server :%v", s.config.Server.GRPCPort))
+	logger.Info(fmt.Sprintf("Start grpc server :%v", s.config.App.GRPCPort))
 
 	go func() {
 		err = s.grpcServer.Serve(listener)

@@ -32,14 +32,14 @@ func NewServer(db *mongo.Database) *Server {
 func (s *Server) Start() error {
 	sRouter := NewRouter(s)
 	s.httpServer = &http.Server{
-		Addr:         fmt.Sprintf(":%d", s.config.Server.HttpPort),
+		Addr:         fmt.Sprintf(":%d", s.config.App.HttpPort),
 		Handler:      sRouter,
 		ReadTimeout:  30 * time.Second,
 		WriteTimeout: 30 * time.Second,
 	}
 
 	go func() {
-		logger.Info(fmt.Sprintf("Starting http server :%v", s.config.Server.HttpPort))
+		logger.Info(fmt.Sprintf("Starting http server :%v", s.config.App.HttpPort))
 		err := s.httpServer.ListenAndServe()
 		if err != nil && err != http.ErrServerClosed {
 			logger.Error(err.Error())

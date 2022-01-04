@@ -9,25 +9,25 @@ import (
 )
 
 type Config struct {
-	Server   ServerConfig
-	DB       DbConfig
-	Whatsapp WhatsappConfig
+	App      App
+	DB       DB
+	Whatsapp Whatsapp
 }
 
-type ServerConfig struct {
-	HttpPort       int32  `env:"SERVER_HTTP_PORT,default=9000"`
-	GRPCPort       int32  `env:"SERVER_GRPC_PORT,default=7000"`
-	CourierBaseURL string `env:"SERVER_COURIER_BASE_URL,required"`
-	SentryDSN      string `env:"SERVER_SENTRY_DSN"`
-	LogLevel       string `env:"SERVER_LOG_LEVEL,default=debug"`
+type App struct {
+	HttpPort       int32  `env:"APP_HTTP_PORT,default=9000"`
+	GRPCPort       int32  `env:"APP_GRPC_PORT,default=7000"`
+	CourierBaseURL string `env:"APP_COURIER_BASE_URL,default=http://localhost:8000/c/wa"`
+	SentryDSN      string `env:"APP_SENTRY_DSN"`
+	LogLevel       string `env:"APP_LOG_LEVEL,default=debug"`
 }
 
-type DbConfig struct {
-	Name string `env:"DB_NAME,required"`
-	URI  string `env:"DB_URI,required"`
+type DB struct {
+	Name string `env:"DB_NAME,default=whatsapp-router"`
+	URI  string `env:"DB_URI,default=mongodb://admin:admin@localhost:27017"`
 }
 
-type WhatsappConfig struct {
+type Whatsapp struct {
 	BaseURL  string `env:"WPP_BASEURL,required"`
 	Username string `env:"WPP_USERNAME,required"`
 	Password string `env:"WPP_PASSWORD,required"`

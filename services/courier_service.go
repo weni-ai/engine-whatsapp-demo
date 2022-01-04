@@ -16,7 +16,7 @@ type DefaultCourierService struct {
 }
 
 func (cs DefaultCourierService) RedirectMessage(channelUUID string, msg string) (int, error) {
-	courierBaseURL := config.GetConfig().Server.CourierBaseURL
+	courierBaseURL := config.GetConfig().App.CourierBaseURL
 	url := fmt.Sprintf("%v/%v/receive", courierBaseURL, channelUUID)
 	resp, err := http.Post(
 		url,
