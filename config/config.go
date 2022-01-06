@@ -3,9 +3,11 @@ package config
 import (
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 
 	"github.com/joeshaw/envdecode"
+	"github.com/weni/whatsapp-router/utils"
 )
 
 type Config struct {
@@ -50,6 +52,19 @@ func GetConfig() *Config {
 }
 
 func GetAuthToken() string {
+	if authToken == "" {
+		req, err := http.NewRequest("GET", "v1/users/login", nil)
+		if err != nil {
+			log.Println(err.Error())
+			return ""
+		}
+		client := utils.GetHTTPClient()
+		_, err = client.Do(req)
+		if err != nil {
+			log.Println(err.Error())
+			return ""
+		}
+	}
 	return authToken
 }
 

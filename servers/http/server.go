@@ -81,6 +81,7 @@ func NewRouter(s *Server) *chi.Mux {
 		r.Post("/users/login", whatsappHandler.RefreshToken)
 		r.Get("/health", whatsappHandler.HandleHealth)
 		r.Get("/media/{mediaID}", whatsappHandler.HandleGetMedia)
+		r.Post("/media", whatsappHandler.HandlePostMedia)
 		r.Patch("/settings/application", func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		})
