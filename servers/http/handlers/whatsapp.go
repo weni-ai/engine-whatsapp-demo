@@ -15,6 +15,7 @@ import (
 	"github.com/weni/whatsapp-router/logger"
 	"github.com/weni/whatsapp-router/models"
 	"github.com/weni/whatsapp-router/services"
+	"github.com/weni/whatsapp-router/utils"
 )
 
 const confirmationMessage = "Token válido, Whatsapp demo está pronto para sua utilização"
@@ -33,6 +34,7 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 
 	incomingWebhookEvent, err := ioutil.ReadAll(io.LimitReader(r.Body, 1000000))
 	r.Body = ioutil.NopCloser(bytes.NewBuffer(incomingWebhookEvent))
+	defer r.Body.Close()
 	if err != nil {
 		logger.Error(fmt.Sprintf("unable to read request body: %s", err))
 		w.WriteHeader(http.StatusOK)
@@ -94,6 +96,7 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 					return
 				} else {
 					body, _ := ioutil.ReadAll(b)
+					b.Close()
 					logger.Debug(string(body))
 					w.WriteHeader(http.StatusOK)
 					return
@@ -111,6 +114,7 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 				} else {
 					body, _ := ioutil.ReadAll(b)
+					b.Close()
 					logger.Debug(string(body))
 					w.WriteHeader(http.StatusOK)
 					return
@@ -181,11 +185,9 @@ func (h *WhatsappHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 
 	h.ConfigService.CreateOrUpdate(&models.Config{Token: newToken})
 
-	w.WriteHeader(http.StatusOK)
-	for k, v := range res.Header {
-		w.Header().Set(k, strings.Join(v, ""))
-	}
-	fmt.Fprint(w, bdString)
+	utils.CopyHeader(w.Header(), res.Header)
+	w.WriteHeader(res.StatusCode)
+	w.Write(bdBytes)
 }
 
 func (h *WhatsappHandler) HandleHealth(w http.ResponseWriter, r *http.Request) {
@@ -195,26 +197,36 @@ func (h *WhatsappHandler) HandleHealth(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	for k, v := range res.Header {
-		w.Header().Set(k, strings.Join(v, ""))
-	}
-	w.WriteHeader(http.StatusOK)
+	utils.CopyHeader(w.Header(), res.Header)
 	io.Copy(w, res.Body)
+	res.Body.Close()
 }
 
 func (h *WhatsappHandler) HandleGetMedia(w http.ResponseWriter, r *http.Request) {
 	mediaID := chi.URLParam(r, "mediaID")
-	res, err := h.WhatsappService.GetMedia(mediaID)
+	res, err := h.WhatsappService.GetMedia(r.Header, mediaID)
 	if err != nil {
 		logger.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	for k, v := range res.Header {
-		w.Header().Set(k, strings.Join(v, ""))
-	}
-	w.WriteHeader(http.StatusOK)
+	utils.CopyHeader(w.Header(), res.Header)
+	w.WriteHeader(res.StatusCode)
 	io.Copy(w, res.Body)
+	res.Body.Close()
+}
+
+func (h *WhatsappHandler) HandlePostMedia(w http.ResponseWriter, r *http.Request) {
+	res, err := h.WhatsappService.PostMedia(r.Header, r.Body)
+	if err != nil {
+		logger.Error(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	utils.CopyHeader(w.Header(), res.Header)
+	w.WriteHeader(res.StatusCode)
+	io.Copy(w, res.Body)
+	res.Body.Close()
 }
 
 func (h *WhatsappHandler) sendTokenConfirmation(contact *models.Contact) (http.Header, io.ReadCloser, error) {

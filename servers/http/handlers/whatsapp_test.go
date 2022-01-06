@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -81,7 +81,7 @@ func TestContactTokenConfirmation(t *testing.T) {
 	mockContactService.EXPECT().CreateContact(dummyContact).Return(dummyContact, nil)
 	mockWhatsappService.EXPECT().SendMessage([]byte(payload)).Return(
 		http.Header{"content-type": {"application/json"}},
-		ioutil.NopCloser(bytes.NewReader([]byte(`{"messages":{"id":"gBEGVYKZRIIyAgmiTgezkroUL2Q"}],"meta":{"api_status":"stable","version":"2.35.2"}}`))),
+		io.NopCloser(bytes.NewReader([]byte(`{"messages":{"id":"gBEGVYKZRIIyAgmiTgezkroUL2Q"}],"meta":{"api_status":"stable","version":"2.35.2"}}`))),
 		nil,
 	)
 
@@ -159,7 +159,7 @@ func TestContactTokenUpdate(t *testing.T) {
 		http.Header{
 			"content-type": {"application/json"},
 		},
-		ioutil.NopCloser(bytes.NewReader([]byte(`{"messages":{"id":"gBEGVYKZRIIyAgmiTgezkroUL2Q"}],"meta":{"api_status":"stable","version":"2.35.2"}}`))),
+		io.NopCloser(bytes.NewReader([]byte(`{"messages":{"id":"gBEGVYKZRIIyAgmiTgezkroUL2Q"}],"meta":{"api_status":"stable","version":"2.35.2"}}`))),
 		nil,
 	)
 
@@ -190,7 +190,7 @@ func TestRefreshToken(t *testing.T) {
 	mockWhatsappService.EXPECT().Login().Return(
 		&http.Response{
 			Header:     http.Header{"content-type": {"application/json"}},
-			Body:       ioutil.NopCloser(bytes.NewReader([]byte(loginBody))),
+			Body:       io.NopCloser(bytes.NewReader([]byte(loginBody))),
 			StatusCode: 200,
 		},
 		nil,
@@ -246,7 +246,7 @@ func TestHandleHealth(t *testing.T) {
 	mockWhatsappService.EXPECT().Health().Return(
 		&http.Response{
 			Header:     http.Header{},
-			Body:       ioutil.NopCloser(bytes.NewReader([]byte(healthBody))),
+			Body:       io.NopCloser(bytes.NewReader([]byte(healthBody))),
 			StatusCode: 200,
 		},
 		nil,
@@ -273,10 +273,10 @@ func TestHandleGetMedia(t *testing.T) {
 
 	mediaID := "123456-qwerty-asdfgh-zxcvb"
 	mockWhatsappService := mocks.NewMockWhatsappService(ctrl)
-	mockWhatsappService.EXPECT().GetMedia(mediaID).Return(
+	mockWhatsappService.EXPECT().GetMedia(http.Header{}, mediaID).Return(
 		&http.Response{
 			Header:     http.Header{},
-			Body:       ioutil.NopCloser(bytes.NewReader([]byte(""))),
+			Body:       io.NopCloser(bytes.NewReader([]byte(""))),
 			StatusCode: 200,
 		},
 		nil,
@@ -285,14 +285,45 @@ func TestHandleGetMedia(t *testing.T) {
 	wh := WhatsappHandler{WhatsappService: mockWhatsappService}
 	router := chi.NewRouter()
 	router.Get("/v1/media/{mediaID}", wh.HandleGetMedia)
-	request, _ := http.NewRequest(
+	request, err := http.NewRequest(
 		http.MethodGet,
 		"/v1/media/"+mediaID,
 		nil,
 	)
+	assert.NoError(t, err)
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, request)
 	assert.Equal(t, 200, response.Code)
+}
+
+func TestHandlePostMedia(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockWhatsappService := mocks.NewMockWhatsappService(ctrl)
+	mockWhatsappService.EXPECT().PostMedia(
+		http.Header{}, http.NoBody,
+	).Return(
+		&http.Response{
+			Header:     http.Header{},
+			Body:       io.NopCloser(bytes.NewReader([]byte(""))),
+			StatusCode: 201,
+		},
+		nil,
+	)
+
+	wh := WhatsappHandler{WhatsappService: mockWhatsappService}
+	router := chi.NewRouter()
+	router.Post("/v1/media", wh.HandlePostMedia)
+	request, err := http.NewRequest(
+		http.MethodPost,
+		"/v1/media",
+		bytes.NewReader([]byte("")),
+	)
+	assert.NoError(t, err)
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	assert.Equal(t, 201, response.Code)
 }
 
 var helloMsg = `{
