@@ -15,6 +15,7 @@ const CONTACT_COLLECTION = "contact"
 type ContactRepository interface {
 	Insert(contact *models.Contact) (*models.Contact, error)
 	FindOne(contact *models.Contact) (*models.Contact, error)
+	Update(contact *models.Contact) (*models.Contact, error)
 }
 
 type ContactRepositoryDb struct {
@@ -43,6 +44,36 @@ func (c ContactRepositoryDb) FindOne(contact *models.Contact) (*models.Contact, 
 		return nil, errors.New("contact not found")
 	}
 	return &cont, nil
+}
+
+func (c ContactRepositoryDb) Update(contact *models.Contact) (*models.Contact, error) {
+	q := bson.M{
+		"urn": contact.URN,
+	}
+	d, err := bson.Marshal(contact)
+	if err != nil {
+		return nil, errors.New("internal server error: " + err.Error())
+	}
+	dc := bson.D{}
+	err = bson.Unmarshal(d, &dc)
+	if err != nil {
+		return nil, errors.New("internal server error: " + err.Error())
+	}
+	result, err := c.DB.Collection(CONTACT_COLLECTION).UpdateOne(
+		context.TODO(),
+		q,
+		bson.D{
+			{Key: "$set", Value: dc},
+		},
+	)
+	if err != nil {
+		return nil, errors.New("unexpected database error - " + err.Error())
+	}
+
+	if id, ok := result.UpsertedID.(primitive.ObjectID); ok {
+		contact.ID = id
+	}
+	return contact, nil
 }
 
 func NewContactRepositoryDb(dbClient *mongo.Database) ContactRepositoryDb {

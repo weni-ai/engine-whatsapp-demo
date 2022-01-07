@@ -35,6 +35,66 @@ func (m *MockWhatsappService) EXPECT() *MockWhatsappServiceMockRecorder {
 	return m.recorder
 }
 
+// GetMedia mocks base method.
+func (m *MockWhatsappService) GetMedia(arg0 http.Header, arg1 string) (*http.Response, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetMedia", arg0, arg1)
+	ret0, _ := ret[0].(*http.Response)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetMedia indicates an expected call of GetMedia.
+func (mr *MockWhatsappServiceMockRecorder) GetMedia(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMedia", reflect.TypeOf((*MockWhatsappService)(nil).GetMedia), arg0, arg1)
+}
+
+// Health mocks base method.
+func (m *MockWhatsappService) Health() (*http.Response, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Health")
+	ret0, _ := ret[0].(*http.Response)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Health indicates an expected call of Health.
+func (mr *MockWhatsappServiceMockRecorder) Health() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Health", reflect.TypeOf((*MockWhatsappService)(nil).Health))
+}
+
+// Login mocks base method.
+func (m *MockWhatsappService) Login() (*http.Response, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Login")
+	ret0, _ := ret[0].(*http.Response)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Login indicates an expected call of Login.
+func (mr *MockWhatsappServiceMockRecorder) Login() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Login", reflect.TypeOf((*MockWhatsappService)(nil).Login))
+}
+
+// PostMedia mocks base method.
+func (m *MockWhatsappService) PostMedia(arg0 http.Header, arg1 io.ReadCloser) (*http.Response, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PostMedia", arg0, arg1)
+	ret0, _ := ret[0].(*http.Response)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PostMedia indicates an expected call of PostMedia.
+func (mr *MockWhatsappServiceMockRecorder) PostMedia(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostMedia", reflect.TypeOf((*MockWhatsappService)(nil).PostMedia), arg0, arg1)
+}
+
 // SendMessage mocks base method.
 func (m *MockWhatsappService) SendMessage(arg0 []byte) (http.Header, io.ReadCloser, error) {
 	m.ctrl.T.Helper()

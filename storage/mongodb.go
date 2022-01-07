@@ -15,8 +15,7 @@ import (
 
 func NewDB() *mongo.Database {
 	dbConf := config.GetConfig().DB
-	uri := fmt.Sprintf("mongodb+srv://%s:%s@%s/?appName=whatsapp-router", dbConf.User, dbConf.Password, dbConf.Host)
-	options := options.Client().ApplyURI(uri)
+	options := options.Client().ApplyURI(dbConf.URI)
 	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer ctxCancel()
 	connection, err := mongo.Connect(ctx, options)
@@ -43,12 +42,12 @@ func NewTestDB() *mongo.Database {
 	defer ctxCancel()
 	connection, err := mongo.Connect(ctx, options)
 	if err != nil {
-		logger.Error("mongodb FAIL")
+		logger.Error(fmt.Sprintf("mongodb FAIL: %s", err.Error()))
 		panic(err.Error())
 	}
 
 	if err := connection.Ping(context.TODO(), readpref.Primary()); err != nil {
-		logger.Error("mongodb FAIL")
+		logger.Error(fmt.Sprintf("mongodb FAIL: %s", err.Error()))
 		panic(err.Error())
 	} else {
 		logger.Info("mongodb OK")
@@ -58,10 +57,16 @@ func NewTestDB() *mongo.Database {
 	return db
 }
 
+func CleanupDB(db *mongo.Database) {
+	err := db.Drop(context.TODO())
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
 func CloseDB(db *mongo.Database) {
 	if err := db.Client().Disconnect(context.TODO()); err != nil {
 		logger.Error(fmt.Sprintf("Error on close MongoDB: %v", err))
-		log.Fatal()
-
+		panic(err.Error())
 	}
 }

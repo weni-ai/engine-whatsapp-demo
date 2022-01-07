@@ -3,6 +3,7 @@ package repositories
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/weni/whatsapp-router/models"
 	"go.mongodb.org/mongo-driver/bson"
@@ -52,7 +53,7 @@ func (c ChannelRepositoryDb) FindById(id string) (*models.Channel, error) {
 		"_id": objId,
 	}
 	if err := c.DB.Collection(CHANNEL_COLLECTION).FindOne(context.TODO(), qry).Decode(&ch); err != nil {
-		return nil, errors.New("channel not found")
+		return nil, fmt.Errorf("FindById failed, channel not found for id=%s. Error: %s", id, err.Error())
 	}
 	return &ch, nil
 }
@@ -63,7 +64,7 @@ func (c ChannelRepositoryDb) FindByToken(token string) (*models.Channel, error) 
 		"token": token,
 	}
 	if err := c.DB.Collection(CHANNEL_COLLECTION).FindOne(context.TODO(), qry).Decode(&ch); err != nil {
-		return nil, errors.New("channel not found")
+		return nil, fmt.Errorf("FindByToken failed, channel not found for token=%s. Error: %s", token, err.Error())
 	}
 	return &ch, nil
 }

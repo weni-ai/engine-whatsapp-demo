@@ -63,3 +63,18 @@ func (mr *MockContactServiceMockRecorder) FindContact(arg0 interface{}) *gomock.
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindContact", reflect.TypeOf((*MockContactService)(nil).FindContact), arg0)
 }
+
+// UpdateContact mocks base method.
+func (m *MockContactService) UpdateContact(arg0 *models.Contact) (*models.Contact, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateContact", arg0)
+	ret0, _ := ret[0].(*models.Contact)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateContact indicates an expected call of UpdateContact.
+func (mr *MockContactServiceMockRecorder) UpdateContact(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateContact", reflect.TypeOf((*MockContactService)(nil).UpdateContact), arg0)
+}

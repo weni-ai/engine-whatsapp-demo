@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"strings"
 
 	"github.com/weni/whatsapp-router/logger"
 	"github.com/weni/whatsapp-router/services"
+	"github.com/weni/whatsapp-router/utils"
 )
 
 type CourierHandler struct {
@@ -27,9 +27,8 @@ func (c *CourierHandler) HandleSendMessage(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	for k, v := range header {
-		w.Header().Set(k, strings.Join(v, ""))
-	}
+	utils.CopyHeader(w.Header(), header)
+	b, _ := ioutil.ReadAll(body)
 	w.WriteHeader(http.StatusCreated)
-	fmt.Fprint(w, body)
+	w.Write(b)
 }

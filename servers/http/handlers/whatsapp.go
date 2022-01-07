@@ -1,46 +1,67 @@
 package handlers
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
-	"net/url"
 	"strings"
 
+	"github.com/go-chi/chi"
 	"github.com/weni/whatsapp-router/config"
 	"github.com/weni/whatsapp-router/logger"
 	"github.com/weni/whatsapp-router/models"
 	"github.com/weni/whatsapp-router/services"
+	"github.com/weni/whatsapp-router/utils"
 )
 
 const confirmationMessage = "Token válido, Whatsapp demo está pronto para sua utilização"
+
+const tokenPrefix = "weni-demo"
 
 type WhatsappHandler struct {
 	ContactService  services.ContactService
 	ChannelService  services.ChannelService
 	CourierService  services.CourierService
 	WhatsappService services.WhatsappService
+	ConfigService   services.ConfigService
 }
 
 func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.Request) {
-	incomingMsg, err := ioutil.ReadAll(r.Body)
+
+	incomingWebhookEvent, err := ioutil.ReadAll(io.LimitReader(r.Body, 1000000))
+	r.Body = ioutil.NopCloser(bytes.NewBuffer(incomingWebhookEvent))
+	defer r.Body.Close()
 	if err != nil {
-		logger.Error("unexpected server error - " + err.Error())
+		logger.Error(fmt.Sprintf("unable to read request body: %s", err))
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprint(w, err.Error())
 		return
 	}
 
-	incomingContact := parseToContact(string(incomingMsg))
-	if incomingContact == nil {
-		err := errors.New("request without being from a contact")
-		logger.Debug(fmt.Sprintf("%v: %v", err.Error(), string(incomingMsg)))
+	payload := &eventPayload{}
+	if err = json.Unmarshal(incomingWebhookEvent, &payload); err != nil {
+		logger.Error(fmt.Sprintf("unable to parse request body: %s", err))
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprint(w, err.Error())
 		return
+	}
+
+	if len(payload.Messages) <= 0 {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	cName := ""
+	if len(payload.Contacts) > 0 {
+		cName = payload.Contacts[0].Profile.Name
+	}
+	incomingContact := &models.Contact{
+		URN:  payload.Messages[0].From,
+		Name: cName,
 	}
 
 	contact, err := h.ContactService.FindContact(incomingContact)
@@ -48,66 +69,84 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 		logger.Debug(err.Error())
 	}
 
-	if contact != nil {
-		channelId := contact.Channel.Hex()
-		channel, err := h.ChannelService.FindChannelById(channelId)
+	textMessage := ""
+	if payload.Messages[0].Type == "text" {
+		textMessage = payload.Messages[0].Text.Body
+	}
+
+	if textMessage != "" && strings.Contains(textMessage, tokenPrefix) {
+		channelFromToken, err := h.ChannelService.FindChannelByToken(textMessage)
 		if err != nil {
 			logger.Debug(err.Error())
 		}
-		if channel != nil {
-			channelUUID := channel.UUID
-			status, err := h.CourierService.RedirectMessage(channelUUID, string(incomingMsg))
-			if err != nil {
-				logger.Debug(err.Error())
-				w.WriteHeader(status)
-				fmt.Fprint(w, err)
-			}
-		}
-
-	} else {
-		if possibleToken := extractTextMessage(string(incomingMsg)); possibleToken != "" {
-			ch, err := h.ChannelService.FindChannelByToken(possibleToken)
-			if err != nil {
-				logger.Error(err.Error())
-			}
-			if ch != nil {
-				incomingContact.Channel = ch.ID
-				h.ContactService.CreateContact(incomingContact)
-				_, b, err := h.sendTokenConfirmation(incomingContact)
+		if channelFromToken != nil {
+			incomingContact.Channel = channelFromToken.ID
+			if contact != nil {
+				contact.Channel = channelFromToken.ID
+				_, err = h.ContactService.UpdateContact(contact)
+				if err != nil {
+					logger.Error(err.Error())
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+				_, b, err := h.sendTokenConfirmation(contact)
 				if err != nil {
 					logger.Error(err.Error())
 					w.WriteHeader(http.StatusInternalServerError)
+					return
 				} else {
 					body, _ := ioutil.ReadAll(b)
-					logger.Info(string(body))
-					w.WriteHeader(http.StatusCreated)
+					b.Close()
+					logger.Debug(string(body))
+					w.WriteHeader(http.StatusOK)
+					return
 				}
-				fmt.Fprint(w, b)
-				return
+			} else {
+				_, err := h.ContactService.CreateContact(incomingContact)
+				if err != nil {
+					logger.Error(err.Error())
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+				_, b, err := h.sendTokenConfirmation(incomingContact)
+				if err != nil {
+					logger.Error(err.Error())
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+				} else {
+					body, _ := ioutil.ReadAll(b)
+					b.Close()
+					logger.Debug(string(body))
+					w.WriteHeader(http.StatusOK)
+					return
+				}
 			}
 		}
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, errors.New("contact not found and token not valid"))
+	} else {
+		if contact != nil {
+			channelId := contact.Channel.Hex()
+			channel, err := h.ChannelService.FindChannelById(channelId)
+			if err != nil {
+				logger.Debug(err.Error())
+			}
+			if channel != nil {
+				channelUUID := channel.UUID
+				status, err := h.CourierService.RedirectMessage(channelUUID, string(incomingWebhookEvent))
+				if err != nil {
+					logger.Debug(err.Error())
+					w.WriteHeader(status)
+					fmt.Fprint(w, err)
+				}
+			}
+		}
 	}
+
+	//returning status ok to avoid retry send mechanisms if contact not exists or token is not valid
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprint(w, errors.New("contact not found and token not valid"))
 }
 
-func RefreshToken(w http.ResponseWriter, r *http.Request) {
-	wconfig := config.GetConfig().Whatsapp
-	httpClient := &http.Client{}
-	reqPath := "/v1/users/login"
-
-	reqURL, _ := url.Parse(wconfig.BaseURL + reqPath)
-
-	req := &http.Request{
-		Method: "POST",
-		URL:    reqURL,
-		Header: map[string][]string{},
-		Body:   r.Body,
-	}
-
-	req.SetBasicAuth(config.AppConf.Whatsapp.Username, config.AppConf.Whatsapp.Password)
-
-	res, err := httpClient.Do(req)
+func (h *WhatsappHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
+	res, err := h.WhatsappService.Login()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprint(w, err.Error())
@@ -115,18 +154,25 @@ func RefreshToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var login struct {
-		Users []struct {
-			Token        string
-			ExpiresAfter string
-		}
-		Meta struct {
-			Version   string
-			ApiStatus string
-		}
+	var login services.LoginWhatsapp
+
+	bdBytes, err := io.ReadAll(res.Body)
+	defer res.Body.Close()
+	if err != nil {
+		logger.Error(err.Error())
+		return
 	}
 
-	if err := json.NewDecoder(res.Body).Decode(&login); err != nil {
+	bdString := string(bdBytes)
+
+	if res.StatusCode != 200 {
+		w.WriteHeader(res.StatusCode)
+		w.Write(bdBytes)
+		logger.Error(fmt.Sprintf("Couldn't update token: %s", bdString))
+		return
+	}
+
+	if err := json.Unmarshal(bdBytes, &login); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprint(w, err.Error())
 		logger.Error(err.Error())
@@ -135,14 +181,52 @@ func RefreshToken(w http.ResponseWriter, r *http.Request) {
 
 	newToken := login.Users[0].Token
 
-	config.UpdateToken(newToken)
-	logger.Info("Whatsapp token update")
-	w.WriteHeader(http.StatusOK)
-	b, _ := json.Marshal(login)
-	for k, v := range res.Header {
-		w.Header().Set(k, strings.Join(v, ""))
+	config.UpdateAuthToken(newToken)
+
+	h.ConfigService.CreateOrUpdate(&models.Config{Token: newToken})
+
+	utils.CopyHeader(w.Header(), res.Header)
+	w.WriteHeader(res.StatusCode)
+	w.Write(bdBytes)
+}
+
+func (h *WhatsappHandler) HandleHealth(w http.ResponseWriter, r *http.Request) {
+	res, err := h.WhatsappService.Health()
+	if err != nil {
+		logger.Error(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
-	fmt.Fprint(w, string(b))
+	utils.CopyHeader(w.Header(), res.Header)
+	io.Copy(w, res.Body)
+	res.Body.Close()
+}
+
+func (h *WhatsappHandler) HandleGetMedia(w http.ResponseWriter, r *http.Request) {
+	mediaID := chi.URLParam(r, "mediaID")
+	res, err := h.WhatsappService.GetMedia(r.Header, mediaID)
+	if err != nil {
+		logger.Error(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	utils.CopyHeader(w.Header(), res.Header)
+	w.WriteHeader(res.StatusCode)
+	io.Copy(w, res.Body)
+	res.Body.Close()
+}
+
+func (h *WhatsappHandler) HandlePostMedia(w http.ResponseWriter, r *http.Request) {
+	res, err := h.WhatsappService.PostMedia(r.Header, r.Body)
+	if err != nil {
+		logger.Error(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	utils.CopyHeader(w.Header(), res.Header)
+	w.WriteHeader(res.StatusCode)
+	io.Copy(w, res.Body)
+	res.Body.Close()
 }
 
 func (h *WhatsappHandler) sendTokenConfirmation(contact *models.Contact) (http.Header, io.ReadCloser, error) {
@@ -157,41 +241,20 @@ func (h *WhatsappHandler) sendTokenConfirmation(contact *models.Contact) (http.H
 	return h.WhatsappService.SendMessage(payloadBytes)
 }
 
-func parseToContact(m string) *models.Contact {
-	name := extractName(m)
-	number := extractNumber(m)
-	if name != "" && number != "" {
-		return &models.Contact{
-			URN:  number,
-			Name: name,
-		}
+type eventPayload struct {
+	Contacts []struct {
+		Profile struct {
+			Name string `json:"name"`
+		} `json:"profile"`
+		WaID string `json:"wa_id"`
+	} `json:"contacts"`
+	Messages []struct {
+		From      string `json:"from"      validate:"required"`
+		ID        string `json:"id"        validate:"required"`
+		Timestamp string `json:"timestamp" validate:"required"`
+		Type      string `json:"type"      validate:"required"`
+		Text      struct {
+			Body string `json:"body"`
+		} `json:"text"`
 	}
-	return nil
-}
-
-func extractName(m string) string {
-	var result map[string][]map[string]map[string]interface{}
-	json.Unmarshal([]byte(m), &result)
-	if result["contacts"] != nil {
-		return result["contacts"][0]["profile"]["name"].(string)
-	}
-	return ""
-}
-
-func extractNumber(m string) string {
-	var result map[string][]map[string]interface{}
-	json.Unmarshal([]byte(m), &result)
-	if result["messages"] != nil {
-		return result["messages"][0]["from"].(string)
-	}
-	return ""
-}
-
-func extractTextMessage(m string) string {
-	var result map[string][]map[string]map[string]interface{}
-	json.Unmarshal([]byte(m), &result)
-	if result["messages"] != nil {
-		return result["messages"][0]["text"]["body"].(string)
-	}
-	return ""
 }

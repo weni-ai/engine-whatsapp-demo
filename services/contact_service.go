@@ -8,6 +8,7 @@ import (
 type ContactService interface {
 	FindContact(*models.Contact) (*models.Contact, error)
 	CreateContact(*models.Contact) (*models.Contact, error)
+	UpdateContact(*models.Contact) (*models.Contact, error)
 }
 
 type DefaultContactService struct {
@@ -34,6 +35,19 @@ func (s DefaultContactService) CreateContact(req *models.Contact) (*models.Conta
 		return nil, err
 	}
 	return newContact, nil
+}
+
+func (s DefaultContactService) UpdateContact(req *models.Contact) (*models.Contact, error) {
+	c := &models.Contact{
+		URN:     req.URN,
+		Name:    req.Name,
+		Channel: req.Channel,
+	}
+	updatedContact, err := s.repo.Update(c)
+	if err != nil {
+		return nil, err
+	}
+	return updatedContact, nil
 }
 
 func NewContactService(repo repositories.ContactRepository) DefaultContactService {

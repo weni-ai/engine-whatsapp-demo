@@ -2,8 +2,8 @@ package http
 
 import (
 	"fmt"
-	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/go-chi/chi"
@@ -32,18 +32,18 @@ func NewServer(db *mongo.Database) *Server {
 func (s *Server) Start() error {
 	sRouter := NewRouter(s)
 	s.httpServer = &http.Server{
-		Addr:         fmt.Sprintf(":%d", s.config.Server.HttpPort),
+		Addr:         fmt.Sprintf(":%d", s.config.App.HttpPort),
 		Handler:      sRouter,
 		ReadTimeout:  30 * time.Second,
 		WriteTimeout: 30 * time.Second,
 	}
 
 	go func() {
-		logger.Info(fmt.Sprintf("Starting http server :%v", s.config.Server.HttpPort))
+		logger.Info(fmt.Sprintf("Starting http server :%v", s.config.App.HttpPort))
 		err := s.httpServer.ListenAndServe()
 		if err != nil && err != http.ErrServerClosed {
 			logger.Error(err.Error())
-			log.Fatal()
+			os.Exit(1)
 		}
 	}()
 
@@ -55,15 +55,19 @@ func NewRouter(s *Server) *chi.Mux {
 
 	contactRepoDb := repositories.NewContactRepositoryDb(s.db)
 	channelRepoDb := repositories.NewChannelRepositoryDb(s.db)
+	configRepoDb := repositories.NewConfigRepository(s.db)
 	whatsappHandler := handlers.WhatsappHandler{
 		ContactService:  services.NewContactService(contactRepoDb),
 		ChannelService:  services.NewChannelService(channelRepoDb),
 		CourierService:  services.NewCourierService(),
 		WhatsappService: services.NewWhatsappService(),
+		ConfigService:   services.NewConfigService(configRepoDb),
 	}
 	courierHandler := handlers.CourierHandler{
 		WhatsappService: services.NewWhatsappService(),
 	}
+
+	router.Use(logger.MiddlewareLogger)
 
 	router.Route("/wr/", func(r chi.Router) {
 		r.Use(ContentTypeJson)
@@ -74,8 +78,11 @@ func NewRouter(s *Server) *chi.Mux {
 
 	router.Route("/v1", func(r chi.Router) {
 		r.Post("/messages", courierHandler.HandleSendMessage)
-		r.Post("/users/login", handlers.RefreshToken)
-		r.Get("/settings/application", func(w http.ResponseWriter, r *http.Request) {
+		r.Post("/users/login", whatsappHandler.RefreshToken)
+		r.Get("/health", whatsappHandler.HandleHealth)
+		r.Get("/media/{mediaID}", whatsappHandler.HandleGetMedia)
+		r.Post("/media", whatsappHandler.HandlePostMedia)
+		r.Patch("/settings/application", func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		})
 	})

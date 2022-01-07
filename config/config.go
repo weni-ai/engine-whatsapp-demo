@@ -3,63 +3,71 @@ package config
 import (
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 
 	"github.com/joeshaw/envdecode"
-	"github.com/joho/godotenv"
-	"github.com/weni/whatsapp-router/logger"
+	"github.com/weni/whatsapp-router/utils"
 )
 
 type Config struct {
-	Server   ServerConfig
-	DB       DbConfig
-	Whatsapp WhatsappConfig
+	App      App
+	DB       DB
+	Whatsapp Whatsapp
 }
 
-type ServerConfig struct {
-	HttpPort       int32  `env:"SERVER_HTTP_PORT,required"`
-	GRPCPort       int32  `env:"SERVER_GRPC_PORT,required"`
-	CourierBaseURL string `env:"SERVER_COURIER_BASE_URL"`
+type App struct {
+	HttpPort       int32  `env:"APP_HTTP_PORT,default=9000"`
+	GRPCPort       int32  `env:"APP_GRPC_PORT,default=7000"`
+	CourierBaseURL string `env:"APP_COURIER_BASE_URL,default=http://localhost:8000/c/wa"`
+	SentryDSN      string `env:"APP_SENTRY_DSN"`
+	LogLevel       string `env:"APP_LOG_LEVEL,default=debug"`
 }
 
-type DbConfig struct {
-	Host     string `env:"DB_HOST,required"`
-	Port     int32  `env:"DB_PORT,required"`
-	User     string `env:"DB_USER,required"`
-	Password string `env:"DB_PASSWORD,required"`
-	Name     string `env:"DB_NAME,required"`
-	AppName  string `env:"DB_APP_NAME,required"`
+type DB struct {
+	Name string `env:"DB_NAME,default=whatsapp-router"`
+	URI  string `env:"DB_URI,default=mongodb://admin:admin@localhost:27017"`
 }
 
-type WhatsappConfig struct {
-	BaseURL   string `env:"WPP_BASEURL,required"`
-	Username  string `env:"WPP_USERNAME,required"`
-	Password  string `env:"WPP_PASSWORD,required"`
-	AuthToken string `env:"WPP_AUTHTOKEN,required"`
+type Whatsapp struct {
+	BaseURL  string `env:"WPP_BASEURL,required"`
+	Username string `env:"WPP_USERNAME,required"`
+	Password string `env:"WPP_PASSWORD,required"`
 }
 
-var AppConf *Config
+var appConf *Config
+
+var authToken string
 
 func GetConfig() *Config {
-	if AppConf == nil {
-		logger.Info("loading config")
-		AppConf = &Config{}
-
-		_, hasEnvVars := os.LookupEnv("DB_HOST")
-		if !hasEnvVars {
-			if err := godotenv.Load("./config/.env"); err != nil {
-				logger.Error(fmt.Sprintf("Error loading .env file: %v", err.Error()))
-			}
-		}
-
-		if err := envdecode.StrictDecode(AppConf); err != nil {
-			logger.Error(fmt.Sprintf("Failed to decode and load environment variables: %v", err.Error()))
-			log.Fatal()
+	if appConf == nil {
+		log.Println("loading config")
+		appConf = &Config{}
+		if err := envdecode.Decode(appConf); err != nil {
+			log.Println(fmt.Sprintf("Failed to decode and load environment variables: %v", err.Error()))
+			os.Exit(1)
 		}
 	}
-	return AppConf
+	return appConf
 }
 
-func UpdateToken(token string) {
-	AppConf.Whatsapp.AuthToken = token
+func GetAuthToken() string {
+	if authToken == "" {
+		req, err := http.NewRequest("GET", "v1/users/login", nil)
+		if err != nil {
+			log.Println(err.Error())
+			return ""
+		}
+		client := utils.GetHTTPClient()
+		_, err = client.Do(req)
+		if err != nil {
+			log.Println(err.Error())
+			return ""
+		}
+	}
+	return authToken
+}
+
+func UpdateAuthToken(token string) {
+	authToken = token
 }
