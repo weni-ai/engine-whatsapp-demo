@@ -2,12 +2,14 @@ package grpc
 
 import (
 	"fmt"
-	"log"
 	"net"
+	"os"
 
 	"github.com/weni/whatsapp-router/config"
-	"github.com/weni/whatsapp-router/servers/grpc/grpc_servers"
+	"github.com/weni/whatsapp-router/logger"
+	"github.com/weni/whatsapp-router/repositories"
 	"github.com/weni/whatsapp-router/servers/grpc/pb"
+	"github.com/weni/whatsapp-router/services"
 	"go.mongodb.org/mongo-driver/mongo"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -28,26 +30,27 @@ func NewServer(db *mongo.Database) *Server {
 }
 
 func (s *Server) Start() error {
-	channelServer := grpc_servers.NewChannelCServer(s.Db)
+	chanelRepository := repositories.NewChannelRepositoryDb(s.Db)
+	channelService := services.NewChannelService(chanelRepository)
 	s.grpcServer = grpc.NewServer()
-	pb.RegisterChannelServiceServer(s.grpcServer, channelServer)
+	pb.RegisterChannelServiceServer(s.grpcServer, channelService)
 	reflection.Register(s.grpcServer)
 
-	address := fmt.Sprintf("0.0.0.0:%d", s.config.Server.GRPCPort)
+	address := fmt.Sprintf("0.0.0.0:%d", s.config.App.GRPCPort)
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
-		log.Fatal(err)
+		logger.Error(err.Error())
+		os.Exit(1)
 		return err
 	}
 
-	log.Printf("Start grpc server :%v", s.config.Server.GRPCPort)
+	logger.Info(fmt.Sprintf("Start grpc server :%v", s.config.App.GRPCPort))
 
-	// s.WaitGroup.Add(1)
 	go func() {
-		// defer s.WaitGroup.Done()
 		err = s.grpcServer.Serve(listener)
 		if err != nil {
-			log.Fatal(err)
+			logger.Error(err.Error())
+			os.Exit(1)
 		}
 	}()
 

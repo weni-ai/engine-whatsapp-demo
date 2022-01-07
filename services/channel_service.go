@@ -1,14 +1,20 @@
 package services
 
 import (
+	"context"
+
+	"github.com/weni/whatsapp-router/logger"
 	"github.com/weni/whatsapp-router/models"
 	"github.com/weni/whatsapp-router/repositories"
+	"github.com/weni/whatsapp-router/servers/grpc/pb"
+	"github.com/weni/whatsapp-router/utils"
 )
 
 type ChannelService interface {
 	FindChannel(*models.Channel) (*models.Channel, error)
 	FindChannelById(string) (*models.Channel, error)
 	FindChannelByToken(string) (*models.Channel, error)
+	CreateChannel(context.Context, *pb.ChannelRequest) (*pb.ChannelResponse, error)
 }
 
 type DefaultChannelService struct {
@@ -33,6 +39,22 @@ func (s DefaultChannelService) FindChannelByToken(req string) (*models.Channel, 
 		return nil, err
 	}
 	return ch, nil
+}
+
+func (s DefaultChannelService) CreateChannel(ctx context.Context, req *pb.ChannelRequest) (*pb.ChannelResponse, error) {
+	var channel models.Channel
+	channel.UUID = req.GetUuid()
+	channel.Name = req.GetName()
+	token := utils.GenToken()
+	channel.Token = token
+	err := s.repo.Insert(&channel)
+	if err != nil {
+		logger.Error(err.Error())
+		return nil, err
+	}
+	return &pb.ChannelResponse{
+		Token: channel.Token,
+	}, nil
 }
 
 func NewChannelService(repo repositories.ChannelRepository) DefaultChannelService {

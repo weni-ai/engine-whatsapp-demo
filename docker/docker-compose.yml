@@ -1,0 +1,12 @@
+version: '3'
+
+services:
+  engine-whatsapp-demo:
+    build:
+      context: ..
+      dockerfile: ./docker/Dockerfile
+    ports:
+      - 9000:9000
+      - 7000:7000
+    extra_hosts:
+      - 'localhost:172.17.0.1'
