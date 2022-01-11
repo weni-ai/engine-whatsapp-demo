@@ -2,7 +2,7 @@ name: Build WhatsApp Router Develop
 on:
   push:
     branches:
-      - feature/build
+      - main
 jobs:
   docker:
     runs-on: ubuntu-latest
