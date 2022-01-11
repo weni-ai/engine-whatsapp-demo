@@ -1,3 +1,6 @@
+v1.0.1
+----------
+ * added build workflows
 v1.0.0
 ----------
  * models for contact, channel and config
