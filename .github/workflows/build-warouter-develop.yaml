@@ -7,7 +7,7 @@ jobs:
   docker:
     runs-on: ubuntu-latest
     environment: 
-      name: production
+      name: develop
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
