@@ -2,50 +2,48 @@ package metric
 
 // ChannelCreation represents a channel creation metric
 type ChannelCreation struct {
+	Channel string
 }
 
 // ChannelCreation returns new metric struct value representation.
-func NewChannelCreation() *ChannelCreation {
-	return &ChannelCreation{}
+func NewChannelCreation(channel string) *ChannelCreation {
+	return &ChannelCreation{Channel: channel}
 }
 
-// ClientMessage represents a client message metric.
-type ClientMessage struct {
-	Channel  string
-	Duration float64
+// ContactMessage represents a contact message metric.
+type ContactMessage struct {
+	Channel string
 }
 
-// ClientMessage returns new metric struct value representation.
-func NewClientMessage() *ClientMessage {
-	return &ClientMessage{}
+// ContactMessage returns new metric struct value representation.
+func NewContactMessage(channel string) *ContactMessage {
+	return &ContactMessage{Channel: channel}
 }
 
 // ContactActivation represents a contact activation ContactActivated metric.
 type ContactActivation struct {
-	Channel  string
-	Duration float64
+	Channel string
 }
 
 // ContactActivation returns new metric struct value representation.
-func NewContactActivation() *ContactActivation {
-	return &ContactActivation{}
+func NewContactActivation(channel string) *ContactActivation {
+	return &ContactActivation{Channel: channel}
 }
 
 // ContactActivated represents a current contact activated gauge metric.
 type ContactActivated struct {
-	Channel  string
-	Duration float64
+	Channel string
 }
 
 // ContactActivated returns new metric struct value representation.
-func NewContactActivated() *ContactActivated {
-	return &ContactActivated{}
+func NewContactActivated(channel string) *ContactActivated {
+	return &ContactActivated{Channel: channel}
 }
 
 // Metric encapsulates interface metric definitions
 type Metric interface {
 	SaveChannelCreation(m *ChannelCreation)
-	SaveClientMessage(m *ClientMessage)
+	SaveContactMessage(m *ContactMessage)
 	SaveContactActivation(m *ContactActivation)
 	IncContactActivated(m *ContactActivated)
 	DecContactActivated(m *ContactActivated)

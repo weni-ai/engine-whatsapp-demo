@@ -4,58 +4,58 @@ import "github.com/prometheus/client_golang/prometheus"
 
 // Service implements metric interface
 type Service struct {
-	channelCreations   prometheus.Counter
-	clientMessages     *prometheus.HistogramVec
-	contactActivations *prometheus.HistogramVec
-	contactActivated   *prometheus.GaugeVec
+	channelsCreations   *prometheus.CounterVec
+	contactsMessages    *prometheus.CounterVec
+	contactsActivations *prometheus.CounterVec
+	contactsActivated   *prometheus.GaugeVec
 }
 
 // NewPrometheusService returns a new metric service
 func NewPrometheusService() (*Service, error) {
-	channelCreations := prometheus.NewCounter(prometheus.CounterOpts{
-		Name: "channel_creations",
-		Help: "Channel creations counter",
-	})
-
-	clientMessages := prometheus.NewHistogramVec(prometheus.HistogramOpts{
-		Name: "client_messages",
-		Help: "Client messages labeled by channel",
+	channelsCreations := prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "channels_creations",
+		Help: "Channel creations counter labeled by channel",
 	}, []string{"channel"})
 
-	contactActivations := prometheus.NewHistogramVec(prometheus.HistogramOpts{
-		Name: "contact_activations",
-		Help: "Contact activation labeled by channel",
+	contactsMessages := prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "contacts_messages",
+		Help: "Contact messages counter labeled by channel",
 	}, []string{"channel"})
 
-	contactActivated := prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "contact_activated",
+	contactsActivations := prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "contacts_activations",
+		Help: "Contact activation counter labeled by channel",
+	}, []string{"channel"})
+
+	contactsActivated := prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "contacts_activated",
 		Help: "Contact activated gauge labeled by channel",
 	}, []string{"channel"})
 
 	s := &Service{
-		channelCreations:   channelCreations,
-		clientMessages:     clientMessages,
-		contactActivations: contactActivations,
-		contactActivated:   contactActivated,
+		channelsCreations:   channelsCreations,
+		contactsMessages:    contactsMessages,
+		contactsActivations: contactsActivations,
+		contactsActivated:   contactsActivated,
 	}
 
-	err := prometheus.Register(s.channelCreations)
-	if err != nil {
+	err := prometheus.Register(s.channelsCreations)
+	if err != nil && err.Error() != "duplicate metrics collector registration attempted" {
 		return nil, err
 	}
 
-	err = prometheus.Register(s.clientMessages)
-	if err != nil {
+	err = prometheus.Register(s.contactsMessages)
+	if err != nil && err.Error() != "duplicate metrics collector registration attempted" {
 		return nil, err
 	}
 
-	err = prometheus.Register(s.contactActivations)
-	if err != nil {
+	err = prometheus.Register(s.contactsActivations)
+	if err != nil && err.Error() != "duplicate metrics collector registration attempted" {
 		return nil, err
 	}
 
-	err = prometheus.Register(s.contactActivated)
-	if err != nil {
+	err = prometheus.Register(s.contactsActivated)
+	if err != nil && err.Error() != "duplicate metrics collector registration attempted" {
 		return nil, err
 	}
 
@@ -64,25 +64,25 @@ func NewPrometheusService() (*Service, error) {
 
 // receive a *metric.ChannelCreation metric and save to a Counter metric type.
 func (s *Service) SaveChannelCreation(cc *ChannelCreation) {
-	s.channelCreations.Inc()
+	s.channelsCreations.WithLabelValues(cc.Channel).Inc()
 }
 
-// receive a *metric.ClientMessage metric and save to a Histogram metric type.
-func (s *Service) SaveClientMessage(cm *ClientMessage) {
-	s.clientMessages.WithLabelValues(cm.Channel).Observe(cm.Duration)
+// receive a *metric.ContactMessage metric and save to a Histogram metric type.
+func (s *Service) SaveContactMessage(cm *ContactMessage) {
+	s.contactsMessages.WithLabelValues(cm.Channel).Inc()
 }
 
 // receive a *metric.ContactActivation metric and save to a Histogram metric type.
 func (s *Service) SaveContactActivation(ca *ContactActivation) {
-	s.contactActivations.WithLabelValues(ca.Channel).Observe(ca.Duration)
+	s.contactsActivations.WithLabelValues(ca.Channel).Inc()
 }
 
 // receive a *metric.ContactActivated metric and increment to a Gauge metric type.
 func (s *Service) IncContactActivated(ca *ContactActivated) {
-	s.contactActivated.WithLabelValues(ca.Channel).Inc()
+	s.contactsActivated.WithLabelValues(ca.Channel).Inc()
 }
 
 // receive a *metric.ContactActivated metric and decrement to a Gauge metric type.
 func (s *Service) DecContactActivated(ca *ContactActivated) {
-	s.contactActivated.WithLabelValues(ca.Channel).Dec()
+	s.contactsActivated.WithLabelValues(ca.Channel).Dec()
 }
