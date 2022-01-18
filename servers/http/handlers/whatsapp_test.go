@@ -73,7 +73,7 @@ func TestContactTokenConfirmation(t *testing.T) {
 	incomingRequest := `{"contacts":[{"profile":{"name":"Dummy"},"wa_id":"12341341234"}],"messages":[{"from":"5582988887777","id":"123456","text":{"body":"weni-demo-44a2m17t0x"},"timestamp":"623123123123","type":"text"}]}`
 
 	metricService, err := metric.NewPrometheusService()
-	assert.NotNil(t, err)
+	assert.NoError(t, err)
 
 	mockChannelService := mocks.NewMockChannelService(ctrl)
 	mockContactService := mocks.NewMockContactService(ctrl)
@@ -112,7 +112,7 @@ func TestHandleIncomingRequest(t *testing.T) {
 			mockWhatsappService := mocks.NewMockWhatsappService(ctrl)
 			mockConfigService := mocks.NewMockConfigService(ctrl)
 			metricService, err := metric.NewPrometheusService()
-			assert.NotNil(t, err)
+			assert.NoError(t, err)
 
 			mockContactService.EXPECT().FindContact(incomingDummyContact).Return(dummyContact, nil)
 			mockChannelService.EXPECT().FindChannelById(channelID.Hex()).Return(dummyChannel, nil)
@@ -145,7 +145,7 @@ func TestContactTokenUpdate(t *testing.T) {
 	mockWhatsappService := mocks.NewMockWhatsappService(ctrl)
 	mockConfigService := mocks.NewMockConfigService(ctrl)
 	metricService, err := metric.NewPrometheusService()
-	assert.NotNil(t, err)
+	assert.NoError(t, err)
 
 	dummyUpdatedContact := &models.Contact{
 		URN:     "5582988887777",
@@ -161,6 +161,7 @@ func TestContactTokenUpdate(t *testing.T) {
 
 	incomingRequest := `{"contacts":[{"profile":{"name":"Dummy"},"wa_id":"12341341234"}],"messages":[{"from":"5582988887777","id":"123456","text":{"body":"weni-demo-1234567890"},"timestamp":"623123123123","type":"text"}]}`
 	mockContactService.EXPECT().FindContact(incomingDummyContact).Return(dummyContact, nil)
+	mockChannelService.EXPECT().FindChannelById(dummyContact.Channel.Hex()).Return(dummyChannel, nil)
 	mockContactService.EXPECT().UpdateContact(dummyContact).Return(dummyUpdatedContact, nil)
 	mockChannelService.EXPECT().FindChannelByToken(dummyChannel2.Token).Return(dummyChannel2, nil)
 	mockWhatsappService.EXPECT().SendMessage([]byte(payload)).Return(
@@ -194,7 +195,7 @@ func TestRefreshToken(t *testing.T) {
 	mockWhatsappService := mocks.NewMockWhatsappService(ctrl)
 	mockConfigService := mocks.NewMockConfigService(ctrl)
 	metricService, err := metric.NewPrometheusService()
-	assert.NotNil(t, err)
+	assert.NoError(t, err)
 
 	loginBody := `{"users":[{"token":"eyJhbGciOiAiSFMyNTYiLCAidHlwIjogIkpXVCJ9.eyJ1c2VyIjoiQWRtaW4iLCJpYXQiOjE2NDAxODIzMjIsImV4cCI6MTY0MDc4NzEyMiwid2E6cmFuZCI6ImVkMWU5OGU4ZjA4NmIxMDQzNDBlM2MxMGFjNGU3YzY3In0.2pEh32jyfBLUjxWNklEtgOrZqy7TgGj48y5pVTgl7FU","expires_after":"2021-12-29 14:12:02+00:00"}],"meta":{"version":"v2.37.1","api_status":"stable"}}`
 	mockWhatsappService.EXPECT().Login().Return(
