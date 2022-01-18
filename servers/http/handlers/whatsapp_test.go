@@ -13,6 +13,7 @@ import (
 	"github.com/go-chi/chi"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
+	"github.com/weni/whatsapp-router/metric"
 	mocks "github.com/weni/whatsapp-router/mocks/services"
 	"github.com/weni/whatsapp-router/models"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -71,6 +72,9 @@ func TestContactTokenConfirmation(t *testing.T) {
 	)
 	incomingRequest := `{"contacts":[{"profile":{"name":"Dummy"},"wa_id":"12341341234"}],"messages":[{"from":"5582988887777","id":"123456","text":{"body":"weni-demo-44a2m17t0x"},"timestamp":"623123123123","type":"text"}]}`
 
+	metricService, err := metric.NewPrometheusService()
+	assert.NotNil(t, err)
+
 	mockChannelService := mocks.NewMockChannelService(ctrl)
 	mockContactService := mocks.NewMockContactService(ctrl)
 	mockCourierService := mocks.NewMockCourierService(ctrl)
@@ -85,7 +89,7 @@ func TestContactTokenConfirmation(t *testing.T) {
 		nil,
 	)
 
-	wh := WhatsappHandler{mockContactService, mockChannelService, mockCourierService, mockWhatsappService, mockConfigService}
+	wh := WhatsappHandler{mockContactService, mockChannelService, mockCourierService, mockWhatsappService, mockConfigService, metricService}
 	router := chi.NewRouter()
 	router.Post("/wr/receive/", wh.HandleIncomingRequests)
 	request, _ := http.NewRequest(
@@ -107,12 +111,14 @@ func TestHandleIncomingRequest(t *testing.T) {
 			mockCourierService := mocks.NewMockCourierService(ctrl)
 			mockWhatsappService := mocks.NewMockWhatsappService(ctrl)
 			mockConfigService := mocks.NewMockConfigService(ctrl)
+			metricService, err := metric.NewPrometheusService()
+			assert.NotNil(t, err)
 
 			mockContactService.EXPECT().FindContact(incomingDummyContact).Return(dummyContact, nil)
 			mockChannelService.EXPECT().FindChannelById(channelID.Hex()).Return(dummyChannel, nil)
 			mockCourierService.EXPECT().RedirectMessage(dummyChannel.UUID, tc.Data).Return(tc.Status, nil)
 
-			wh := WhatsappHandler{mockContactService, mockChannelService, mockCourierService, mockWhatsappService, mockConfigService}
+			wh := WhatsappHandler{mockContactService, mockChannelService, mockCourierService, mockWhatsappService, mockConfigService, metricService}
 			router := chi.NewRouter()
 			router.Post("/wr/receive/", wh.HandleIncomingRequests)
 			request, _ := http.NewRequest(
@@ -138,6 +144,8 @@ func TestContactTokenUpdate(t *testing.T) {
 	mockCourierService := mocks.NewMockCourierService(ctrl)
 	mockWhatsappService := mocks.NewMockWhatsappService(ctrl)
 	mockConfigService := mocks.NewMockConfigService(ctrl)
+	metricService, err := metric.NewPrometheusService()
+	assert.NotNil(t, err)
 
 	dummyUpdatedContact := &models.Contact{
 		URN:     "5582988887777",
@@ -163,7 +171,7 @@ func TestContactTokenUpdate(t *testing.T) {
 		nil,
 	)
 
-	wh := WhatsappHandler{mockContactService, mockChannelService, mockCourierService, mockWhatsappService, mockConfigService}
+	wh := WhatsappHandler{mockContactService, mockChannelService, mockCourierService, mockWhatsappService, mockConfigService, metricService}
 	router := chi.NewRouter()
 	router.Post("/wr/receive/", wh.HandleIncomingRequests)
 	request, _ := http.NewRequest(
@@ -185,6 +193,8 @@ func TestRefreshToken(t *testing.T) {
 	mockCourierService := mocks.NewMockCourierService(ctrl)
 	mockWhatsappService := mocks.NewMockWhatsappService(ctrl)
 	mockConfigService := mocks.NewMockConfigService(ctrl)
+	metricService, err := metric.NewPrometheusService()
+	assert.NotNil(t, err)
 
 	loginBody := `{"users":[{"token":"eyJhbGciOiAiSFMyNTYiLCAidHlwIjogIkpXVCJ9.eyJ1c2VyIjoiQWRtaW4iLCJpYXQiOjE2NDAxODIzMjIsImV4cCI6MTY0MDc4NzEyMiwid2E6cmFuZCI6ImVkMWU5OGU4ZjA4NmIxMDQzNDBlM2MxMGFjNGU3YzY3In0.2pEh32jyfBLUjxWNklEtgOrZqy7TgGj48y5pVTgl7FU","expires_after":"2021-12-29 14:12:02+00:00"}],"meta":{"version":"v2.37.1","api_status":"stable"}}`
 	mockWhatsappService.EXPECT().Login().Return(
@@ -203,7 +213,7 @@ func TestRefreshToken(t *testing.T) {
 		conf,
 	).Return(conf, nil)
 
-	wh := WhatsappHandler{mockContactService, mockChannelService, mockCourierService, mockWhatsappService, mockConfigService}
+	wh := WhatsappHandler{mockContactService, mockChannelService, mockCourierService, mockWhatsappService, mockConfigService, metricService}
 	router := chi.NewRouter()
 	testRoute := "/v1/users/login"
 	router.Post(testRoute, wh.RefreshToken)
