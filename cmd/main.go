@@ -12,6 +12,7 @@ import (
 	"github.com/go-co-op/gocron"
 	"github.com/weni/whatsapp-router/config"
 	"github.com/weni/whatsapp-router/logger"
+	"github.com/weni/whatsapp-router/metric"
 	"github.com/weni/whatsapp-router/models"
 	"github.com/weni/whatsapp-router/repositories"
 	"github.com/weni/whatsapp-router/servers/grpc"
@@ -27,14 +28,20 @@ func main() {
 	logger.Info("Starting application...")
 
 	initAuthToken(db)
+	var err error
+	metrics, err := metric.NewPrometheusService()
+	if err != nil {
+		logger.Error(err.Error())
+		os.Exit(1)
+	}
 
-	httpServer := http.NewServer(db)
+	httpServer := http.NewServer(db, metrics)
 	if err := httpServer.Start(); err != nil {
 		logger.Error(fmt.Sprintf("Server startup failed: %v", err))
 		os.Exit(1)
 	}
 
-	grpcServer := grpc.NewServer(db)
+	grpcServer := grpc.NewServer(db, metrics)
 	if err := grpcServer.Start(); err != nil {
 		logger.Error(fmt.Sprintf("grpc server startup failed: %v", err))
 		os.Exit(1)

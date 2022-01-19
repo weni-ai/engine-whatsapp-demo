@@ -5,8 +5,49 @@ services:
     build:
       context: ..
       dockerfile: ./docker/Dockerfile
+    environment:
+      - APP_COURIER_BASE_URL=CHANGE-ME
+      - WPP_BASEURL=CHANGE-ME
+      - WPP_USERNAME=CHANGE-ME
+      - WPP_PASSWORD=CHANGE-ME
+      - DB_URI=mongodb://admin:admin@dbmongo:27017
     ports:
       - 9000:9000
       - 7000:7000
     extra_hosts:
       - 'localhost:172.17.0.1'
+    depends_on:
+      - prometheus
+      - grafana
+      - dbmongo
+  prometheus:
+    image: prom/prometheus:v2.20.1
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    ports:
+      - 9090:9090
+  grafana:
+    image: grafana/grafana:7.1.5
+    environment:
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+    volumes:
+      - ./grafana/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml
+    ports:
+      - 3000:3000
+  dbmongo:
+    image: mongo
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=admin
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongo 10.10.10.60:27017/test --quiet
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    ports:
+      - 27017:27017
+volumes:
+  prometheus_data: {}
