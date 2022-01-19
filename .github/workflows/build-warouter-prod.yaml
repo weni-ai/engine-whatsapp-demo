@@ -1,4 +1,4 @@
-name: Build WhatsApp Router Develop
+name: Build WhatsApp Router Production
 on:
   push:
     branches:
@@ -7,7 +7,7 @@ jobs:
   docker:
     runs-on: ubuntu-latest
     environment: 
-      name: develop
+      name: production
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
