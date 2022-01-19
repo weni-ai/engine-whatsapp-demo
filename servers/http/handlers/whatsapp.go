@@ -13,6 +13,7 @@ import (
 	"github.com/go-chi/chi"
 	"github.com/weni/whatsapp-router/config"
 	"github.com/weni/whatsapp-router/logger"
+	"github.com/weni/whatsapp-router/metric"
 	"github.com/weni/whatsapp-router/models"
 	"github.com/weni/whatsapp-router/services"
 	"github.com/weni/whatsapp-router/utils"
@@ -28,10 +29,10 @@ type WhatsappHandler struct {
 	CourierService  services.CourierService
 	WhatsappService services.WhatsappService
 	ConfigService   services.ConfigService
+	Metrics         *metric.Service
 }
 
 func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.Request) {
-
 	incomingWebhookEvent, err := ioutil.ReadAll(io.LimitReader(r.Body, 1000000))
 	r.Body = ioutil.NopCloser(bytes.NewBuffer(incomingWebhookEvent))
 	defer r.Body.Close()
@@ -82,6 +83,12 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 		if channelFromToken != nil {
 			incomingContact.Channel = channelFromToken.ID
 			if contact != nil {
+				lastContactChannel, err := h.ChannelService.FindChannelById(contact.Channel.Hex())
+				if err != nil {
+					logger.Error(err.Error())
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
 				contact.Channel = channelFromToken.ID
 				_, err = h.ContactService.UpdateContact(contact)
 				if err != nil {
@@ -94,13 +101,21 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 					logger.Error(err.Error())
 					w.WriteHeader(http.StatusInternalServerError)
 					return
-				} else {
-					body, _ := ioutil.ReadAll(b)
-					b.Close()
-					logger.Debug(string(body))
-					w.WriteHeader(http.StatusOK)
-					return
 				}
+
+				body, _ := ioutil.ReadAll(b)
+				b.Close()
+				logger.Debug(string(body))
+				w.WriteHeader(http.StatusOK)
+
+				contactActivatedMetricDec := metric.NewContactActivated(lastContactChannel.UUID)
+				h.Metrics.DecContactActivated(contactActivatedMetricDec)
+				contactActivatedMetricInc := metric.NewContactActivated(lastContactChannel.UUID)
+				h.Metrics.IncContactActivated(contactActivatedMetricInc)
+				contactActivation := metric.NewContactActivation(channelFromToken.UUID)
+				h.Metrics.SaveContactActivation(contactActivation)
+
+				return
 			} else {
 				_, err := h.ContactService.CreateContact(incomingContact)
 				if err != nil {
@@ -112,13 +127,18 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 				if err != nil {
 					logger.Error(err.Error())
 					http.Error(w, err.Error(), http.StatusInternalServerError)
-				} else {
-					body, _ := ioutil.ReadAll(b)
-					b.Close()
-					logger.Debug(string(body))
-					w.WriteHeader(http.StatusOK)
 					return
 				}
+				body, _ := ioutil.ReadAll(b)
+				b.Close()
+				logger.Debug(string(body))
+				w.WriteHeader(http.StatusOK)
+
+				contactActivation := metric.NewContactActivation(channelFromToken.UUID)
+				h.Metrics.SaveContactActivation(contactActivation)
+				contactActivated := metric.NewContactActivated(channelFromToken.UUID)
+				h.Metrics.IncContactActivated(contactActivated)
+				return
 			}
 		}
 	} else {
@@ -135,7 +155,10 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 					logger.Debug(err.Error())
 					w.WriteHeader(status)
 					fmt.Fprint(w, err)
+					return
 				}
+				cmm := metric.NewContactMessage(channelUUID)
+				h.Metrics.SaveContactMessage(cmm)
 			}
 		}
 	}

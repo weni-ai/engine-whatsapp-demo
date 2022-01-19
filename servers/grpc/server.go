@@ -7,6 +7,7 @@ import (
 
 	"github.com/weni/whatsapp-router/config"
 	"github.com/weni/whatsapp-router/logger"
+	"github.com/weni/whatsapp-router/metric"
 	"github.com/weni/whatsapp-router/repositories"
 	"github.com/weni/whatsapp-router/servers/grpc/pb"
 	"github.com/weni/whatsapp-router/services"
@@ -19,19 +20,21 @@ type Server struct {
 	config     config.Config
 	Db         *mongo.Database
 	grpcServer *grpc.Server
+	metrics    *metric.Service
 }
 
-func NewServer(db *mongo.Database) *Server {
+func NewServer(db *mongo.Database, metrics *metric.Service) *Server {
 	conf := config.GetConfig()
 	return &Server{
-		Db:     db,
-		config: *conf,
+		Db:      db,
+		config:  *conf,
+		metrics: metrics,
 	}
 }
 
 func (s *Server) Start() error {
 	chanelRepository := repositories.NewChannelRepositoryDb(s.Db)
-	channelService := services.NewChannelService(chanelRepository)
+	channelService := services.NewChannelService(chanelRepository, s.metrics)
 	s.grpcServer = grpc.NewServer()
 	pb.RegisterChannelServiceServer(s.grpcServer, channelService)
 	reflection.Register(s.grpcServer)

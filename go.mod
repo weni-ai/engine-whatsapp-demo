@@ -9,9 +9,9 @@ require (
 	github.com/go-chi/chi v1.5.4
 	github.com/go-co-op/gocron v1.11.0
 	github.com/golang/mock v1.6.0
-	github.com/google/go-cmp v0.5.5 // indirect
 	github.com/joeshaw/envdecode v0.0.0-20200121155833-099f1fc765bd
 	github.com/klauspost/compress v1.9.7 // indirect
+	github.com/prometheus/client_golang v1.11.0
 	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.7.0
 	go.mongodb.org/mongo-driver v1.7.2
@@ -20,5 +20,5 @@ require (
 	golang.org/x/sys v0.0.0-20211007075335-d3039528d8ac // indirect
 	golang.org/x/text v0.3.7 // indirect
 	google.golang.org/grpc v1.40.0
-	google.golang.org/protobuf v1.25.0
+	google.golang.org/protobuf v1.26.0-rc.1
 )

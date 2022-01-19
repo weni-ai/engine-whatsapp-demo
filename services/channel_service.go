@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/weni/whatsapp-router/logger"
+	"github.com/weni/whatsapp-router/metric"
 	"github.com/weni/whatsapp-router/models"
 	"github.com/weni/whatsapp-router/repositories"
 	"github.com/weni/whatsapp-router/servers/grpc/pb"
@@ -18,7 +19,8 @@ type ChannelService interface {
 }
 
 type DefaultChannelService struct {
-	repo repositories.ChannelRepository
+	repo    repositories.ChannelRepository
+	Metrics *metric.Service
 }
 
 func (s DefaultChannelService) FindChannel(req *models.Channel) (*models.Channel, error) {
@@ -52,11 +54,13 @@ func (s DefaultChannelService) CreateChannel(ctx context.Context, req *pb.Channe
 		logger.Error(err.Error())
 		return nil, err
 	}
+	channelCreationMetric := metric.NewChannelCreation(channel.UUID)
+	s.Metrics.SaveChannelCreation(channelCreationMetric)
 	return &pb.ChannelResponse{
 		Token: channel.Token,
 	}, nil
 }
 
-func NewChannelService(repo repositories.ChannelRepository) DefaultChannelService {
-	return DefaultChannelService{repo}
+func NewChannelService(repo repositories.ChannelRepository, metricService *metric.Service) DefaultChannelService {
+	return DefaultChannelService{repo, metricService}
 }

@@ -7,8 +7,10 @@ import (
 	"time"
 
 	"github.com/go-chi/chi"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/weni/whatsapp-router/config"
 	"github.com/weni/whatsapp-router/logger"
+	"github.com/weni/whatsapp-router/metric"
 	"github.com/weni/whatsapp-router/repositories"
 	"github.com/weni/whatsapp-router/servers/http/handlers"
 	"github.com/weni/whatsapp-router/services"
@@ -19,13 +21,15 @@ type Server struct {
 	config     config.Config
 	db         *mongo.Database
 	httpServer *http.Server
+	metrics    *metric.Service
 }
 
-func NewServer(db *mongo.Database) *Server {
+func NewServer(db *mongo.Database, metrics *metric.Service) *Server {
 	conf := config.GetConfig()
 	return &Server{
-		db:     db,
-		config: *conf,
+		db:      db,
+		config:  *conf,
+		metrics: metrics,
 	}
 }
 
@@ -58,10 +62,11 @@ func NewRouter(s *Server) *chi.Mux {
 	configRepoDb := repositories.NewConfigRepository(s.db)
 	whatsappHandler := handlers.WhatsappHandler{
 		ContactService:  services.NewContactService(contactRepoDb),
-		ChannelService:  services.NewChannelService(channelRepoDb),
+		ChannelService:  services.NewChannelService(channelRepoDb, s.metrics),
 		CourierService:  services.NewCourierService(),
 		WhatsappService: services.NewWhatsappService(),
 		ConfigService:   services.NewConfigService(configRepoDb),
+		Metrics:         s.metrics,
 	}
 	courierHandler := handlers.CourierHandler{
 		WhatsappService: services.NewWhatsappService(),
@@ -90,6 +95,8 @@ func NewRouter(s *Server) *chi.Mux {
 	router.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
+
+	router.Get("/metrics", promhttp.Handler().ServeHTTP)
 
 	return router
 }
