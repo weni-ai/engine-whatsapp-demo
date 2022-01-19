@@ -1,3 +1,6 @@
+v1.1.0
+----------
+ * add prometheus metrics for channel creations, contacts activations, contact messages and defaults.
 v1.0.1
 ----------
  * added build workflows
