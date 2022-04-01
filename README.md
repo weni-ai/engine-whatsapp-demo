@@ -22,18 +22,20 @@ A system with Go and a mongo database to connect and persist data.
 git clone https://github.com/Ilhasoft/engine-whatsapp-demo
 ```
 environment variables
-```
-APP_HTTP_PORT
-APP_GRPC_PORT
-APP_COURIER_BASE_URL
-APP_SENTRY_DSN
-APP_LOG_LEVEL
-DB_NAME
-DB_URI
-WPP_BASEURL
-WPP_USERNAME
-WPP_PASSWORD
-```
+
+  | Variable              | Required | Default |
+  |-----------------------|:--------:|---------|
+  | APP_HTTP_PORT         | false    | 9000    |
+  | APP_GRPC_PORT         | false    | 7000    |
+  | APP_COURIER_BASE_URL  | false    | http://localhost:8000/c/wa |
+  | APP_SENTRY_DSN        | false    |    -    |
+  | APP_LOG_LEVEL         | false    | debug   |
+  | DB_NAME               | false    | whatsapp-router |
+  | DB_URI                | false    | mongodb://admin:admin@localhost:27017 |
+  | WPP_BASEURL           | true     |    -    |
+  | WPP_USERNAME          | true     |    -    |
+  | WPP_PASSWORD          | true     |    -    |
+ 
 - #### Run application
 ```
 go run cmd/main.go
