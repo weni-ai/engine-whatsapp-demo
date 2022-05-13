@@ -16,6 +16,7 @@ type ChannelService interface {
 	FindChannelById(string) (*models.Channel, error)
 	FindChannelByToken(string) (*models.Channel, error)
 	CreateChannel(context.Context, *pb.ChannelRequest) (*pb.ChannelResponse, error)
+	CreateChannelDefault(*models.Channel) (*models.Channel, error)
 }
 
 type DefaultChannelService struct {
@@ -59,6 +60,17 @@ func (s DefaultChannelService) CreateChannel(ctx context.Context, req *pb.Channe
 	return &pb.ChannelResponse{
 		Token: channel.Token,
 	}, nil
+}
+
+func (s DefaultChannelService) CreateChannelDefault(channel *models.Channel) (*models.Channel, error) {
+	err := s.repo.Insert(channel)
+	if err != nil {
+		logger.Error(err.Error())
+		return nil, err
+	}
+	channelCreationMetric := metric.NewChannelCreation(channel.UUID)
+	s.Metrics.SaveChannelCreation(channelCreationMetric)
+	return channel, nil
 }
 
 func NewChannelService(repo repositories.ChannelRepository, metricService *metric.Service) DefaultChannelService {

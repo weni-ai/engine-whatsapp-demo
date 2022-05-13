@@ -71,6 +71,9 @@ func NewRouter(s *Server) *chi.Mux {
 	courierHandler := handlers.CourierHandler{
 		WhatsappService: services.NewWhatsappService(),
 	}
+	integrationsHandler := handlers.IntegrationsHandler{
+		ChannelService: services.NewChannelService(channelRepoDb, s.metrics),
+	}
 
 	router.Use(logger.MiddlewareLogger)
 
@@ -90,6 +93,11 @@ func NewRouter(s *Server) *chi.Mux {
 		r.Patch("/settings/application", func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		})
+		r.Post("/channels", integrationsHandler.HandleCreateChannel)
+	})
+
+	router.Post("/integrations/channel", func(w http.ResponseWriter, r *http.Request) {
+
 	})
 
 	router.Get("/", func(w http.ResponseWriter, r *http.Request) {
