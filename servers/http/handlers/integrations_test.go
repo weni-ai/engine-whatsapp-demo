@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"io"
 	"io/ioutil"
+	"log"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
@@ -23,6 +24,7 @@ import (
 	"github.com/go-resty/resty/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/weni/whatsapp-router/config"
 	"github.com/weni/whatsapp-router/models"
 	"github.com/weni/whatsapp-router/servers/grpc/pb"
 )
@@ -79,18 +81,16 @@ func (cs mockChannelService) FindChannelByToken(token string) (*models.Channel, 
 
 func TestKeycloakAuth(t *testing.T) {
 	cfg := GetConfig(t)
-	kkClient := NewClientWithDebug(t)
+	kkClient = NewClientWithDebug(t)
 	assert.NotNil(t, kkClient)
 
 	SetUpTestUser(t, kkClient)
 
 	token := GetUserToken(t, kkClient)
-	_, err := kkClient.GetUserInfo(
-		context.Background(),
-		token.AccessToken,
-		cfg.GoCloak.Realm,
-	)
-	assert.NoError(t, err)
+
+	config.GetConfig().OIDC.Realm = cfg.GoCloak.Realm
+
+	log.Println("GGwp")
 
 	router := chi.NewRouter()
 	router.Post("/", KeycloackAuth(func(w http.ResponseWriter, r *http.Request) {
