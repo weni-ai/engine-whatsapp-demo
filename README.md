@@ -35,6 +35,9 @@ environment variables
   | WPP_BASEURL           | true     |    -    |
   | WPP_USERNAME          | true     |    -    |
   | WPP_PASSWORD          | true     |    -    |
+  | OIDC_REALM            | false    | gocloak |
+  | OIDC_HOST             | false    | http://localhost:8080 |
+
 
 - #### Run application
 ```

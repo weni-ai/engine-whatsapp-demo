@@ -37,10 +37,8 @@ type Whatsapp struct {
 }
 
 type OIDC struct {
-	ClientID     string `env:"OIDC_RP_CLIENT_ID"`
-	ClientSecret string `env:"OIDC_RP_CLIENT_SECRET"`
-	Realm        string `env:"OIDC_REALM"`
-	Host         string `env:"OIDC_HOST"`
+	Realm string `env:"OIDC_REALM,default=gocloak"`
+	Host  string `env:"OIDC_HOST,default=http://localhost:8080"`
 }
 
 var appConf *Config
