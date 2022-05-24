@@ -93,12 +93,9 @@ func NewRouter(s *Server) *chi.Mux {
 		r.Patch("/settings/application", func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		})
-		r.Post("/channels", integrationsHandler.HandleCreateChannel)
 	})
 
-	router.Post("/integrations/channel", func(w http.ResponseWriter, r *http.Request) {
-
-	})
+	router.Post("/integrations/channel", handlers.KeycloackAuth(integrationsHandler.HandleCreateChannel))
 
 	router.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
