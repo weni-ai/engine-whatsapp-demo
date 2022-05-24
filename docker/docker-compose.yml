@@ -20,6 +20,7 @@ services:
       - prometheus
       - grafana
       - dbmongo
+      - keycloak
   prometheus:
     image: prom/prometheus:v2.20.1
     volumes:
@@ -49,5 +50,17 @@ services:
       retries: 3
     ports:
       - 27017:27017
+    
+  keycloak:
+    image: jboss/keycloak:latest
+    environment:
+      KEYCLOAK_IMPORT: /tmp/gocloak-realm.json
+      KEYCLOAK_USER: admin
+      KEYCLOAK_PASSWORD: secret
+      JAVA_OPTS_APPEND: -Dkeycloak.profile.feature.upload_scripts=enabled
+    ports:
+      - "8080:8080"
+    volumes:
+      - ../testdata/gocloak-realm.json:/tmp/gocloak-realm.json
 volumes:
   prometheus_data: {}

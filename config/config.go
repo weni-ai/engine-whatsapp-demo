@@ -14,6 +14,7 @@ type Config struct {
 	App      App
 	DB       DB
 	Whatsapp Whatsapp
+	OIDC     OIDC
 }
 
 type App struct {
@@ -33,6 +34,11 @@ type Whatsapp struct {
 	BaseURL  string `env:"WPP_BASEURL,required"`
 	Username string `env:"WPP_USERNAME,required"`
 	Password string `env:"WPP_PASSWORD,required"`
+}
+
+type OIDC struct {
+	Realm string `env:"OIDC_REALM,default=gocloak"`
+	Host  string `env:"OIDC_HOST,default=http://localhost:8080"`
 }
 
 var appConf *Config
