@@ -53,6 +53,7 @@ func KeycloackAuth(next http.HandlerFunc) http.HandlerFunc {
 		_, err := kkClient.GetUserInfo(ctx, token, config.GetConfig().OIDC.Realm)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusUnauthorized)
+			return
 		}
 		next.ServeHTTP(w, r)
 	}
