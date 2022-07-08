@@ -158,7 +158,7 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 					return
 				}
 				if status >= 400 {
-					logger.Debug(fmt.Sprintf("message redirect wiwth status %d for channel %s", status, channelUUID))
+					logger.Debug(fmt.Sprintf("message redirect with status %d for channel %s", status, channelUUID))
 					return
 				}
 				cmm := metric.NewContactMessage(channelUUID)
