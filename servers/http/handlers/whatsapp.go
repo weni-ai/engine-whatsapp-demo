@@ -157,13 +157,23 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 					fmt.Fprint(w, err)
 					return
 				}
+				if status >= 400 {
+					logger.Debug(fmt.Sprintf("message redirect with status %d for channel %s", status, channelUUID))
+					return
+				}
 				cmm := metric.NewContactMessage(channelUUID)
 				h.Metrics.SaveContactMessage(cmm)
+				w.WriteHeader(http.StatusOK)
+				return
 			}
+			logger.Debug("channel not found")
+			w.WriteHeader(http.StatusOK)
+			return
 		}
 	}
 
 	//returning status ok to avoid retry send mechanisms if contact not exists or token is not valid
+	logger.Debug("contact not found and token not valid")
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprint(w, errors.New("contact not found and token not valid"))
 }

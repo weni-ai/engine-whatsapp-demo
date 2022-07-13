@@ -27,6 +27,10 @@ func (h *IntegrationsHandler) HandleCreateChannel(w http.ResponseWriter, r *http
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	if ch.UUID == "" {
+		http.Error(w, "channel uuid could not be empty", http.StatusBadRequest)
+		return
+	}
 	ch.Token = utils.GenToken()
 	_, err = h.ChannelService.CreateChannelDefault(ch)
 	if err != nil {
