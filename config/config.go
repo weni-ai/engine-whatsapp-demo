@@ -31,9 +31,10 @@ type DB struct {
 }
 
 type Whatsapp struct {
-	BaseURL  string `env:"WPP_BASEURL,required"`
-	Username string `env:"WPP_USERNAME,required"`
-	Password string `env:"WPP_PASSWORD,required"`
+	BaseURL        string `env:"WPP_BASEURL,required"`
+	Username       string `env:"WPP_USERNAME,required"`
+	Password       string `env:"WPP_PASSWORD,required"`
+	WelcomeMessage string `env:"WPP_CONFIRMATION_MESSAGE,default=Olá, bem vindo ao WhatsApp Demo, para iniciar um fluxo de mensagens envie a *palavra chave* do fluxo que deseja iniciar 👀"`
 }
 
 type OIDC struct {
