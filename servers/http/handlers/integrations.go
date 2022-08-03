@@ -18,6 +18,7 @@ var kkClient gocloak.GoCloak
 
 type IntegrationsHandler struct {
 	ChannelService services.ChannelService
+	FlowsService   services.FlowsService
 }
 
 func (h *IntegrationsHandler) HandleCreateChannel(w http.ResponseWriter, r *http.Request) {
@@ -65,4 +66,23 @@ func KeycloackAuth(next http.HandlerFunc) http.HandlerFunc {
 
 func NewKeycloakClient() gocloak.GoCloak {
 	return gocloak.NewClient(config.GetConfig().OIDC.Host)
+}
+
+func (h *IntegrationsHandler) HandleInitialProjectFlows(w http.ResponseWriter, r *http.Request) {
+	flows := &models.Flows{}
+	err := json.NewDecoder(r.Body).Decode(flows)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if flows.Channel.String() == "" || flows.FlowsStarts == nil {
+		http.Error(w, "channel uuid or flows list could not be empty", http.StatusBadRequest)
+		return
+	}
+
+	_, err = h.FlowsService.CreateFlows(flows)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	w.WriteHeader(http.StatusCreated)
 }
