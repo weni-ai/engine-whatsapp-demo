@@ -19,7 +19,7 @@ import (
 	"github.com/weni/whatsapp-router/utils"
 )
 
-const confirmationMessage = "Token válido, Whatsapp demo está pronto para sua utilização"
+var confirmationMessage = config.GetConfig().Whatsapp.WelcomeMessage
 
 const tokenPrefix = "weni-demo"
 
