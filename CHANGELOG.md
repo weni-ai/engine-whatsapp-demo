@@ -1,3 +1,7 @@
+v1.2.2
+---------- 
+ * Add welcome message as environment variable #21
+
 v1.2.1
 ----------
  * fix channel creation validation #19.
