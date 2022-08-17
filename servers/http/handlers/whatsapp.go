@@ -30,6 +30,7 @@ type WhatsappHandler struct {
 	WhatsappService services.WhatsappService
 	ConfigService   services.ConfigService
 	Metrics         *metric.Service
+	FlowsService    services.FlowsService
 }
 
 func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.Request) {
@@ -115,6 +116,18 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 				contactActivation := metric.NewContactActivation(channelFromToken.UUID)
 				h.Metrics.SaveContactActivation(contactActivation)
 
+				_, b, err = h.sendFlowsChoice(contact)
+				if err != nil {
+					logger.Error(err.Error())
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+
+				body, _ = ioutil.ReadAll(b)
+				b.Close()
+				logger.Debug(string(body))
+				w.WriteHeader(http.StatusOK)
+
 				return
 			} else {
 				_, err := h.ContactService.CreateContact(incomingContact)
@@ -138,6 +151,19 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 				h.Metrics.SaveContactActivation(contactActivation)
 				contactActivated := metric.NewContactActivated(channelFromToken.UUID)
 				h.Metrics.IncContactActivated(contactActivated)
+
+				_, b, err = h.sendFlowsChoice(contact)
+				if err != nil {
+					logger.Error(err.Error())
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+
+				body, _ = ioutil.ReadAll(b)
+				b.Close()
+				logger.Debug(string(body))
+				w.WriteHeader(http.StatusOK)
+
 				return
 			}
 		}
@@ -148,15 +174,49 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 			if err != nil {
 				logger.Debug(err.Error())
 			}
+			hasKeyword := false
 			if channel != nil {
-				channelUUID := channel.UUID
-				status, err := h.CourierService.RedirectMessage(channelUUID, string(incomingWebhookEvent))
+
+				flows := &models.Flows{
+					Channel: contact.Channel,
+				}
+
+				fls, err := h.FlowsService.FindFlows(flows)
 				if err != nil {
 					logger.Debug(err.Error())
-					w.WriteHeader(status)
-					fmt.Fprint(w, err)
-					return
 				}
+
+				for _, fl := range fls.FlowsStarts {
+					if textMessage == fl.Name {
+						payload.Messages[0].Text.Body = fl.Keyword
+						hasKeyword = true
+						break
+					}
+				}
+				channelUUID := channel.UUID
+				var status int
+				if hasKeyword {
+					payloadBytes, err := json.Marshal(payload)
+					if err != nil {
+						logger.Debug(err.Error())
+					}
+					status, err = h.CourierService.RedirectMessage(channelUUID, string(payloadBytes))
+					if err != nil {
+						logger.Debug(err.Error())
+						w.WriteHeader(status)
+						fmt.Fprint(w, err)
+						return
+					}
+				} else {
+					status, err = h.CourierService.RedirectMessage(channelUUID, string(incomingWebhookEvent))
+					if err != nil {
+						logger.Debug(err.Error())
+						w.WriteHeader(status)
+						fmt.Fprint(w, err)
+						return
+					}
+				}
+
 				if status >= 400 {
 					logger.Debug(fmt.Sprintf("message redirect with status %d for channel %s", status, channelUUID))
 					return
@@ -268,6 +328,65 @@ func (h *WhatsappHandler) sendTokenConfirmation(contact *models.Contact) (http.H
 		`{"to":"%s","type":"text","text":{"body":"%s"}}`,
 		urn,
 		confirmationMessage,
+	)
+	payloadBytes := []byte(payload)
+
+	return h.WhatsappService.SendMessage(payloadBytes)
+}
+
+func (h *WhatsappHandler) sendFlowsChoice(contact *models.Contact) (http.Header, io.ReadCloser, error) {
+	urn := contact.URN
+
+	flows := &models.Flows{
+		Channel: contact.Channel,
+	}
+
+	fl, err := h.FlowsService.FindFlows(flows)
+	if err != nil {
+		logger.Debug(err.Error())
+	}
+
+	payload := fmt.Sprintf(
+		`{
+			"to":"%s",
+			"type":"interactive",
+			"interative":{
+				"type":"button",
+				"body":"Escolha abaixo qual fluxo deseja iniciar.",
+				"action": {
+					"buttons": [
+						{
+							"type": "reply",
+							"reply": {
+							"id": "%s",
+							"title": "%s" 
+							}
+						},
+						{
+							"type": "reply",
+							"reply": {
+							"id": "%s",
+							"title": "%s" 
+							}
+						},
+						{
+							"type": "reply",
+							"reply": {
+							"id": "%s",
+							"title": "%s" 
+							}
+						}
+					] 
+				}
+			}
+		}`,
+		urn,
+		fl.FlowsStarts[0].Name,
+		fl.FlowsStarts[0].Name,
+		fl.FlowsStarts[1].Name,
+		fl.FlowsStarts[1].Name,
+		fl.FlowsStarts[2].Name,
+		fl.FlowsStarts[2].Name,
 	)
 	payloadBytes := []byte(payload)
 

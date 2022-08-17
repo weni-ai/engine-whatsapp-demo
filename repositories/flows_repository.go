@@ -38,7 +38,7 @@ func (f FlowsRepositoryDb) Insert(flows *models.Flows) (*models.Flows, error) {
 func (f FlowsRepositoryDb) FindOne(flows *models.Flows) (*models.Flows, error) {
 	var fl models.Flows
 	qry := bson.M{
-		"flows_starts": flows.FlowsStarts,
+		"channel_uuid": flows.Channel,
 	}
 	if err := f.DB.Collection(FLOWS_COLLECTION).FindOne(context.TODO(), qry).Decode(&fl); err != nil {
 		return nil, errors.New("flows not found")
