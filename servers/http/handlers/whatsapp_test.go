@@ -61,14 +61,51 @@ var incomingDummyContact = &models.Contact{
 	Name: "Dummy",
 }
 
-func TestContactTokenConfirmation(t *testing.T) {
+func TestContactSendFlowsChoice(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	payload := fmt.Sprintf(
-		`{"to":"%s","type":"text","text":{"body":"%s"}}`,
+	payloadFlows := fmt.Sprintf(
+		`{
+			"to":"%s",
+			"type":"interactive",
+			"interative":{
+				"type":"button",
+				"body":"Escolha abaixo qual fluxo deseja iniciar.",
+				"action": {
+					"buttons": [
+						{
+							"type": "reply",
+							"reply": {
+							"id": "%s",
+							"title": "%s" 
+							}
+						},
+						{
+							"type": "reply",
+							"reply": {
+							"id": "%s",
+							"title": "%s" 
+							}
+						},
+						{
+							"type": "reply",
+							"reply": {
+							"id": "%s",
+							"title": "%s" 
+							}
+						}
+					] 
+				}
+			}
+		}`,
 		dummyContact.URN,
-		confirmationMessage,
+		fl.FlowsStarts[0].Name,
+		fl.FlowsStarts[0].Name,
+		fl.FlowsStarts[1].Name,
+		fl.FlowsStarts[1].Name,
+		fl.FlowsStarts[2].Name,
+		fl.FlowsStarts[2].Name,
 	)
 	incomingRequest := `{"contacts":[{"profile":{"name":"Dummy"},"wa_id":"12341341234"}],"messages":[{"from":"5582988887777","id":"123456","text":{"body":"weni-demo-44a2m17t0x"},"timestamp":"623123123123","type":"text"}]}`
 
@@ -80,16 +117,18 @@ func TestContactTokenConfirmation(t *testing.T) {
 	mockCourierService := mocks.NewMockCourierService(ctrl)
 	mockWhatsappService := mocks.NewMockWhatsappService(ctrl)
 	mockConfigService := mocks.NewMockConfigService(ctrl)
+	mockFlowsService := mocks.NewMockFlowsService(ctrl)
 	mockChannelService.EXPECT().FindChannelByToken(dummyChannel.Token).Return(dummyChannel, nil)
 	mockContactService.EXPECT().FindContact(incomingDummyContact).Return(nil, errors.New("contact not found"))
 	mockContactService.EXPECT().CreateContact(dummyContact).Return(dummyContact, nil)
-	mockWhatsappService.EXPECT().SendMessage([]byte(payload)).Return(
+	mockFlowsService.EXPECT().FindFlows(flows).Return(fl, nil)
+	mockWhatsappService.EXPECT().SendMessage([]byte(payloadFlows)).Return(
 		http.Header{"content-type": {"application/json"}},
-		io.NopCloser(bytes.NewReader([]byte(`{"messages":{"id":"gBEGVYKZRIIyAgmiTgezkroUL2Q"}],"meta":{"api_status":"stable","version":"2.35.2"}}`))),
+		io.NopCloser(bytes.NewReader([]byte(`{"messages":{"id":"hBEGVYKZRIIyAgmiTgezkroUL2Q"}],"meta":{"api_status":"stable","version":"2.35.2"}}`))),
 		nil,
 	)
 
-	wh := WhatsappHandler{mockContactService, mockChannelService, mockCourierService, mockWhatsappService, mockConfigService, metricService}
+	wh := WhatsappHandler{mockContactService, mockChannelService, mockCourierService, mockWhatsappService, mockConfigService, metricService, mockFlowsService}
 	router := chi.NewRouter()
 	router.Post("/wr/receive/", wh.HandleIncomingRequests)
 	request, _ := http.NewRequest(
@@ -112,13 +151,15 @@ func TestHandleIncomingRequest(t *testing.T) {
 			mockWhatsappService := mocks.NewMockWhatsappService(ctrl)
 			mockConfigService := mocks.NewMockConfigService(ctrl)
 			metricService, err := metric.NewPrometheusService()
+			mockFlowsService := mocks.NewMockFlowsService(ctrl)
 			assert.NoError(t, err)
 
 			mockContactService.EXPECT().FindContact(incomingDummyContact).Return(dummyContact, nil)
 			mockChannelService.EXPECT().FindChannelById(channelID.Hex()).Return(dummyChannel, nil)
+			mockFlowsService.EXPECT().FindFlows(flows).Return(fl, nil)
 			mockCourierService.EXPECT().RedirectMessage(dummyChannel.UUID, tc.Data).Return(tc.Status, nil)
 
-			wh := WhatsappHandler{mockContactService, mockChannelService, mockCourierService, mockWhatsappService, mockConfigService, metricService}
+			wh := WhatsappHandler{mockContactService, mockChannelService, mockCourierService, mockWhatsappService, mockConfigService, metricService, mockFlowsService}
 			router := chi.NewRouter()
 			router.Post("/wr/receive/", wh.HandleIncomingRequests)
 			request, _ := http.NewRequest(
@@ -144,6 +185,7 @@ func TestContactTokenUpdate(t *testing.T) {
 	mockCourierService := mocks.NewMockCourierService(ctrl)
 	mockWhatsappService := mocks.NewMockWhatsappService(ctrl)
 	mockConfigService := mocks.NewMockConfigService(ctrl)
+	mockFlowsService := mocks.NewMockFlowsService(ctrl)
 	metricService, err := metric.NewPrometheusService()
 	assert.NoError(t, err)
 
@@ -153,10 +195,47 @@ func TestContactTokenUpdate(t *testing.T) {
 		Channel: dummyChannel2.ID,
 	}
 
-	payload := fmt.Sprintf(
-		`{"to":"%s","type":"text","text":{"body":"%s"}}`,
-		dummyContact.URN,
-		confirmationMessage,
+	payloadFlows := fmt.Sprintf(
+		`{
+			"to":"%s",
+			"type":"interactive",
+			"interative":{
+				"type":"button",
+				"body":"Escolha abaixo qual fluxo deseja iniciar.",
+				"action": {
+					"buttons": [
+						{
+							"type": "reply",
+							"reply": {
+							"id": "%s",
+							"title": "%s" 
+							}
+						},
+						{
+							"type": "reply",
+							"reply": {
+							"id": "%s",
+							"title": "%s" 
+							}
+						},
+						{
+							"type": "reply",
+							"reply": {
+							"id": "%s",
+							"title": "%s" 
+							}
+						}
+					] 
+				}
+			}
+		}`,
+		dummyUpdatedContact.URN,
+		fl.FlowsStarts[0].Name,
+		fl.FlowsStarts[0].Name,
+		fl.FlowsStarts[1].Name,
+		fl.FlowsStarts[1].Name,
+		fl.FlowsStarts[2].Name,
+		fl.FlowsStarts[2].Name,
 	)
 
 	incomingRequest := `{"contacts":[{"profile":{"name":"Dummy"},"wa_id":"12341341234"}],"messages":[{"from":"5582988887777","id":"123456","text":{"body":"weni-demo-1234567890"},"timestamp":"623123123123","type":"text"}]}`
@@ -164,15 +243,14 @@ func TestContactTokenUpdate(t *testing.T) {
 	mockChannelService.EXPECT().FindChannelById(dummyContact.Channel.Hex()).Return(dummyChannel, nil)
 	mockContactService.EXPECT().UpdateContact(dummyContact).Return(dummyUpdatedContact, nil)
 	mockChannelService.EXPECT().FindChannelByToken(dummyChannel2.Token).Return(dummyChannel2, nil)
-	mockWhatsappService.EXPECT().SendMessage([]byte(payload)).Return(
-		http.Header{
-			"content-type": {"application/json"},
-		},
-		io.NopCloser(bytes.NewReader([]byte(`{"messages":{"id":"gBEGVYKZRIIyAgmiTgezkroUL2Q"}],"meta":{"api_status":"stable","version":"2.35.2"}}`))),
+	mockFlowsService.EXPECT().FindFlows(flowsUpdate).Return(flUpdate, nil)
+	mockWhatsappService.EXPECT().SendMessage([]byte(payloadFlows)).Return(
+		http.Header{"content-type": {"application/json"}},
+		io.NopCloser(bytes.NewReader([]byte(`{"messages":{"id":"hBEGVYKZRIIyAgmiTgezkroUL2Q"}],"meta":{"api_status":"stable","version":"2.35.2"}}`))),
 		nil,
 	)
 
-	wh := WhatsappHandler{mockContactService, mockChannelService, mockCourierService, mockWhatsappService, mockConfigService, metricService}
+	wh := WhatsappHandler{mockContactService, mockChannelService, mockCourierService, mockWhatsappService, mockConfigService, metricService, mockFlowsService}
 	router := chi.NewRouter()
 	router.Post("/wr/receive/", wh.HandleIncomingRequests)
 	request, _ := http.NewRequest(
@@ -194,6 +272,7 @@ func TestRefreshToken(t *testing.T) {
 	mockCourierService := mocks.NewMockCourierService(ctrl)
 	mockWhatsappService := mocks.NewMockWhatsappService(ctrl)
 	mockConfigService := mocks.NewMockConfigService(ctrl)
+	mockFlowsService := mocks.NewMockFlowsService(ctrl)
 	metricService, err := metric.NewPrometheusService()
 	assert.NoError(t, err)
 
@@ -214,7 +293,7 @@ func TestRefreshToken(t *testing.T) {
 		conf,
 	).Return(conf, nil)
 
-	wh := WhatsappHandler{mockContactService, mockChannelService, mockCourierService, mockWhatsappService, mockConfigService, metricService}
+	wh := WhatsappHandler{mockContactService, mockChannelService, mockCourierService, mockWhatsappService, mockConfigService, metricService, mockFlowsService}
 	router := chi.NewRouter()
 	testRoute := "/v1/users/login"
 	router.Post(testRoute, wh.RefreshToken)
@@ -335,6 +414,56 @@ func TestHandlePostMedia(t *testing.T) {
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, request)
 	assert.Equal(t, 201, response.Code)
+}
+
+var flows = &models.Flows{
+	Channel: dummyContact.Channel,
+}
+
+var fl = &models.Flows{
+	Channel: dummyChannel.ID,
+	FlowsStarts: []models.Flow{
+		{
+			Name:    "flow1",
+			UUID:    "b23662c3-935b-4748-b715-b62a44e9d228",
+			Keyword: "flow1",
+		},
+		{
+			Name:    "flow2",
+			UUID:    "b23662c3-935b-4748-b725-b62a44e9d228",
+			Keyword: "flow2",
+		},
+		{
+			Name:    "flow3",
+			UUID:    "b23662c3-935b-4748-b735-b62a44e9d228",
+			Keyword: "flow3",
+		},
+	},
+}
+
+var flowsUpdate = &models.Flows{
+	Channel: dummyChannel2.ID,
+}
+
+var flUpdate = &models.Flows{
+	Channel: dummyChannel2.ID,
+	FlowsStarts: []models.Flow{
+		{
+			Name:    "flow1",
+			UUID:    "b23662c3-935b-4748-b715-b62a44e9d228",
+			Keyword: "flow1",
+		},
+		{
+			Name:    "flow2",
+			UUID:    "b23662c3-935b-4748-b725-b62a44e9d228",
+			Keyword: "flow2",
+		},
+		{
+			Name:    "flow3",
+			UUID:    "b23662c3-935b-4748-b735-b62a44e9d228",
+			Keyword: "flow3",
+		},
+	},
 }
 
 var helloMsg = `{

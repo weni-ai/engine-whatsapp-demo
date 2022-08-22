@@ -97,7 +97,7 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
 				}
-				_, b, err := h.sendTokenConfirmation(contact)
+				_, b, err := h.sendFlowsChoice(contact)
 				if err != nil {
 					logger.Error(err.Error())
 					w.WriteHeader(http.StatusInternalServerError)
@@ -116,18 +116,6 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 				contactActivation := metric.NewContactActivation(channelFromToken.UUID)
 				h.Metrics.SaveContactActivation(contactActivation)
 
-				_, b, err = h.sendFlowsChoice(contact)
-				if err != nil {
-					logger.Error(err.Error())
-					w.WriteHeader(http.StatusInternalServerError)
-					return
-				}
-
-				body, _ = ioutil.ReadAll(b)
-				b.Close()
-				logger.Debug(string(body))
-				w.WriteHeader(http.StatusOK)
-
 				return
 			} else {
 				_, err := h.ContactService.CreateContact(incomingContact)
@@ -136,7 +124,7 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
 				}
-				_, b, err := h.sendTokenConfirmation(incomingContact)
+				_, b, err := h.sendFlowsChoice(incomingContact)
 				if err != nil {
 					logger.Error(err.Error())
 					http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -145,24 +133,11 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 				body, _ := ioutil.ReadAll(b)
 				b.Close()
 				logger.Debug(string(body))
-				w.WriteHeader(http.StatusOK)
 
 				contactActivation := metric.NewContactActivation(channelFromToken.UUID)
 				h.Metrics.SaveContactActivation(contactActivation)
 				contactActivated := metric.NewContactActivated(channelFromToken.UUID)
 				h.Metrics.IncContactActivated(contactActivated)
-
-				_, b, err = h.sendFlowsChoice(contact)
-				if err != nil {
-					logger.Error(err.Error())
-					w.WriteHeader(http.StatusInternalServerError)
-					return
-				}
-
-				body, _ = ioutil.ReadAll(b)
-				b.Close()
-				logger.Debug(string(body))
-				w.WriteHeader(http.StatusOK)
 
 				return
 			}
@@ -322,17 +297,17 @@ func (h *WhatsappHandler) HandlePostMedia(w http.ResponseWriter, r *http.Request
 	res.Body.Close()
 }
 
-func (h *WhatsappHandler) sendTokenConfirmation(contact *models.Contact) (http.Header, io.ReadCloser, error) {
-	urn := contact.URN
-	payload := fmt.Sprintf(
-		`{"to":"%s","type":"text","text":{"body":"%s"}}`,
-		urn,
-		confirmationMessage,
-	)
-	payloadBytes := []byte(payload)
+// func (h *WhatsappHandler) sendTokenConfirmation(contact *models.Contact) (http.Header, io.ReadCloser, error) {
+// 	urn := contact.URN
+// 	payload := fmt.Sprintf(
+// 		`{"to":"%s","type":"text","text":{"body":"%s"}}`,
+// 		urn,
+// 		confirmationMessage,
+// 	)
+// 	payloadBytes := []byte(payload)
 
-	return h.WhatsappService.SendMessage(payloadBytes)
-}
+// 	return h.WhatsappService.SendMessage(payloadBytes)
+// }
 
 func (h *WhatsappHandler) sendFlowsChoice(contact *models.Contact) (http.Header, io.ReadCloser, error) {
 	urn := contact.URN
