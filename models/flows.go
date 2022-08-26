@@ -1,10 +1,8 @@
 package models
 
-import "go.mongodb.org/mongo-driver/bson/primitive"
-
 type Flows struct {
-	Channel     primitive.ObjectID `json:"channel_uuid,omitempty" bson:"channel_uuid,omitempty"`
-	FlowsStarts []Flow             `json:"flows_starts,omitempty" bson:"flows_starts,omitempty"`
+	Channel     string `json:"channel_uuid,omitempty" bson:"channel_uuid,omitempty"`
+	FlowsStarts []Flow `json:"flows_starts,omitempty" bson:"flows_starts,omitempty"`
 }
 
 type Flow struct {

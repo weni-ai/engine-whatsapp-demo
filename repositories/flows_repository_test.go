@@ -34,7 +34,7 @@ var tcInsertFlows = []struct {
 					Keyword: "hello3",
 				},
 			},
-			Channel: dummyChannel.ID,
+			Channel: dummyChannel.UUID,
 		},
 	},
 }
@@ -83,7 +83,7 @@ var tcFindOneFlows = []struct {
 					Keyword: "hello3",
 				},
 			},
-			Channel: dummyChannel.ID,
+			Channel: dummyChannel.UUID,
 		},
 	},
 }
@@ -132,7 +132,7 @@ var tcUpdateFlows = []struct {
 					Keyword: "hello3",
 				},
 			},
-			Channel: dummyChannel.ID,
+			Channel: dummyChannel.UUID,
 		},
 		ChannelToUdate: dummyChannel2,
 	},
@@ -147,7 +147,7 @@ func TestUpdateFlows(t *testing.T) {
 		t.Run(tc.TestName, func(t *testing.T) {
 			flowsToUpdate := &models.Flows{
 				FlowsStarts: tc.Flows.FlowsStarts,
-				Channel:     tc.ChannelToUdate.ID,
+				Channel:     tc.ChannelToUdate.UUID,
 			}
 			f, err := flowsRepository.Update(flowsToUpdate)
 			if fmt.Sprint(err) != fmt.Sprint(tc.Err) {

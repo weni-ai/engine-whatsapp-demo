@@ -417,11 +417,11 @@ func TestHandlePostMedia(t *testing.T) {
 }
 
 var flows = &models.Flows{
-	Channel: dummyContact.Channel,
+	Channel: dummyChannel.UUID,
 }
 
 var fl = &models.Flows{
-	Channel: dummyChannel.ID,
+	Channel: dummyChannel.UUID,
 	FlowsStarts: []models.Flow{
 		{
 			Name:    "flow1",
@@ -442,11 +442,11 @@ var fl = &models.Flows{
 }
 
 var flowsUpdate = &models.Flows{
-	Channel: dummyChannel2.ID,
+	Channel: dummyChannel2.UUID,
 }
 
 var flUpdate = &models.Flows{
-	Channel: dummyChannel2.ID,
+	Channel: dummyChannel2.UUID,
 	FlowsStarts: []models.Flow{
 		{
 			Name:    "flow1",

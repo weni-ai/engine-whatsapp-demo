@@ -29,7 +29,6 @@ import (
 	mocks "github.com/weni/whatsapp-router/mocks/services"
 	"github.com/weni/whatsapp-router/models"
 	"github.com/weni/whatsapp-router/servers/grpc/pb"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 func TestHandleCreateChannel(t *testing.T) {
@@ -293,14 +292,14 @@ var DummyFl = &models.Flows{
 			Keyword: "hello3",
 		},
 	},
-	Channel: primitive.NewObjectID(),
+	Channel: "1d514cf1-a829-415d-8955-748563e173cf",
 }
 
 func TestHandleInitialProjectFlows(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	dummyPayload := `{"channel_uuid":` + `"` + DummyFl.Channel.Hex() + `"` + `,"flows_starts":[{"flow_name":"test_flow1","flow_uuid":"507b6703-cc80-41fc-8a1b-cca573518dbb","keyword":"hello1"},{"flow_name":"test_flow2","flow_uuid":"a76b3106-5e3d-462d-a0fc-4817c0d73ce7","keyword":"hello2"},{"flow_name":"test_flow3","flow_uuid":"d7c97de5-bd06-4d7f-904f-63a7f8dd6b9d","keyword":"hello3"}]}`
+	dummyPayload := `{"channel_uuid":` + `"` + DummyFl.Channel + `"` + `,"flows_starts":[{"flow_name":"test_flow1","flow_uuid":"507b6703-cc80-41fc-8a1b-cca573518dbb","keyword":"hello1"},{"flow_name":"test_flow2","flow_uuid":"a76b3106-5e3d-462d-a0fc-4817c0d73ce7","keyword":"hello2"},{"flow_name":"test_flow3","flow_uuid":"d7c97de5-bd06-4d7f-904f-63a7f8dd6b9d","keyword":"hello3"}]}`
 
 	mockFlowsService := mocks.NewMockFlowsService(ctrl)
 	ih := IntegrationsHandler{mockChannelService{}, mockFlowsService}

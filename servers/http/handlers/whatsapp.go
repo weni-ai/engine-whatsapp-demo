@@ -97,7 +97,7 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
 				}
-				_, b, err := h.sendFlowsChoice(contact)
+				_, b, err := h.sendFlowsChoice(channelFromToken, contact)
 				if err != nil {
 					logger.Error(err.Error())
 					w.WriteHeader(http.StatusInternalServerError)
@@ -124,7 +124,7 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
 				}
-				_, b, err := h.sendFlowsChoice(incomingContact)
+				_, b, err := h.sendFlowsChoice(channelFromToken, contact)
 				if err != nil {
 					logger.Error(err.Error())
 					http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -153,7 +153,7 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 			if channel != nil {
 
 				flows := &models.Flows{
-					Channel: contact.Channel,
+					Channel: channel.UUID,
 				}
 
 				fls, err := h.FlowsService.FindFlows(flows)
@@ -309,11 +309,11 @@ func (h *WhatsappHandler) HandlePostMedia(w http.ResponseWriter, r *http.Request
 // 	return h.WhatsappService.SendMessage(payloadBytes)
 // }
 
-func (h *WhatsappHandler) sendFlowsChoice(contact *models.Contact) (http.Header, io.ReadCloser, error) {
+func (h *WhatsappHandler) sendFlowsChoice(channel *models.Channel, contact *models.Contact) (http.Header, io.ReadCloser, error) {
 	urn := contact.URN
 
 	flows := &models.Flows{
-		Channel: contact.Channel,
+		Channel: channel.UUID,
 	}
 
 	fl, err := h.FlowsService.FindFlows(flows)
