@@ -118,7 +118,7 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 
 				return
 			} else {
-				_, err := h.ContactService.CreateContact(incomingContact)
+				contact, err := h.ContactService.CreateContact(incomingContact)
 				if err != nil {
 					logger.Error(err.Error())
 					http.Error(w, err.Error(), http.StatusInternalServerError)
