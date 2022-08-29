@@ -6,6 +6,7 @@ import (
 
 	"github.com/weni/whatsapp-router/models"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -27,8 +28,8 @@ func (f FlowsRepositoryDb) Insert(flows *models.Flows) (*models.Flows, error) {
 		return nil, errors.New("unexpected database error - " + err.Error())
 	}
 
-	if id, ok := result.InsertedID.(string); ok {
-		flows.Channel = id
+	if id, ok := result.InsertedID.(primitive.ObjectID); ok {
+		flows.ID = id
 	}
 
 	return flows, nil
@@ -69,8 +70,8 @@ func (f FlowsRepositoryDb) Update(flows *models.Flows) (*models.Flows, error) {
 		return nil, errors.New("unexpected database error - " + err.Error())
 	}
 
-	if id, ok := result.UpsertedID.(string); ok {
-		flows.Channel = id
+	if id, ok := result.UpsertedID.(primitive.ObjectID); ok {
+		flows.ID = id
 	}
 	return flows, nil
 }
