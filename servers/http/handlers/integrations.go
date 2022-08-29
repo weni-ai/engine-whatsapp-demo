@@ -82,7 +82,7 @@ func (h *IntegrationsHandler) HandleInitialProjectFlows(w http.ResponseWriter, r
 
 	_, err = h.FlowsService.CreateFlows(flows)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "error creating flows", http.StatusInternalServerError)
 	}
 	w.WriteHeader(http.StatusCreated)
 }
