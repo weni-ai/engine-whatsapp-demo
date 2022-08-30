@@ -74,6 +74,8 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 	textMessage := ""
 	if payload.Messages[0].Type == "text" {
 		textMessage = payload.Messages[0].Text.Body
+	} else if payload.Messages[0].Type == "interactive" {
+		textMessage = payload.Messages[0].Interactive.ButtonReply.Title
 	}
 
 	if textMessage != "" && strings.Contains(textMessage, tokenPrefix) {
@@ -385,5 +387,12 @@ type eventPayload struct {
 		Text      struct {
 			Body string `json:"body"`
 		} `json:"text"`
+		Interactive struct {
+			ButtonReply struct {
+				ID    string `json:"id"`
+				Title string `json:"title"`
+			} `json:"button_reply"`
+			Type string `json:"type"`
+		}
 	}
 }
