@@ -325,30 +325,32 @@ func (h *WhatsappHandler) sendFlowsChoice(channel *models.Channel, contact *mode
 		`{
 			"to":"%s",
 			"type":"interactive",
-			"interative":{
+			"interactive":{
 				"type":"button",
-				"body":"Escolha abaixo qual fluxo deseja iniciar.",
+				"body":{
+					"text": "Escolha abaixo qual fluxo deseja iniciar."
+				},	
 				"action": {
 					"buttons": [
 						{
 							"type": "reply",
 							"reply": {
-							"id": "%s",
-							"title": "%s" 
+								"id": "%s",
+								"title": "%s" 
 							}
 						},
 						{
 							"type": "reply",
 							"reply": {
-							"id": "%s",
-							"title": "%s" 
+								"id": "%s",
+								"title": "%s" 
 							}
 						},
 						{
 							"type": "reply",
 							"reply": {
-							"id": "%s",
-							"title": "%s" 
+								"id": "%s",
+								"title": "%s" 
 							}
 						}
 					] 

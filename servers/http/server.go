@@ -66,6 +66,7 @@ func NewRouter(s *Server) *chi.Mux {
 		ChannelService:  services.NewChannelService(channelRepoDb, s.metrics),
 		CourierService:  services.NewCourierService(),
 		WhatsappService: services.NewWhatsappService(),
+		FlowsService:    services.NewFlowsService(flowsRepoDb),
 		ConfigService:   services.NewConfigService(configRepoDb),
 		Metrics:         s.metrics,
 	}
