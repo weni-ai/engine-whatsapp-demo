@@ -59,6 +59,7 @@ func NewRouter(s *Server) *chi.Mux {
 
 	contactRepoDb := repositories.NewContactRepositoryDb(s.db)
 	channelRepoDb := repositories.NewChannelRepositoryDb(s.db)
+	flowsRepoDb := repositories.NewFlowsRepositoryDb(s.db)
 	configRepoDb := repositories.NewConfigRepository(s.db)
 	whatsappHandler := handlers.WhatsappHandler{
 		ContactService:  services.NewContactService(contactRepoDb),
@@ -73,6 +74,7 @@ func NewRouter(s *Server) *chi.Mux {
 	}
 	integrationsHandler := handlers.IntegrationsHandler{
 		ChannelService: services.NewChannelService(channelRepoDb, s.metrics),
+		FlowsService:   services.NewFlowsService(flowsRepoDb),
 	}
 
 	router.Use(logger.MiddlewareLogger)
@@ -96,7 +98,7 @@ func NewRouter(s *Server) *chi.Mux {
 	})
 
 	router.Post("/integrations/channel", handlers.KeycloackAuth(integrationsHandler.HandleCreateChannel))
-	router.Post("/integrations/flows", integrationsHandler.HandleInitialProjectFlows)
+	router.Post("/integrations/flows", handlers.KeycloackAuth(integrationsHandler.HandleInitialProjectFlows))
 
 	router.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
