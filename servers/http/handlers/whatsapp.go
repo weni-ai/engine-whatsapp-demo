@@ -19,7 +19,7 @@ import (
 	"github.com/weni/whatsapp-router/utils"
 )
 
-var confirmationMessage = config.GetConfig().Whatsapp.WelcomeMessage
+var welcomeMessage = config.GetConfig().Whatsapp.WelcomeMessage
 
 const tokenPrefix = "weni-demo"
 
@@ -162,10 +162,10 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 				if err != nil {
 					logger.Debug(err.Error())
 				}
-
+				var keyword string
 				for _, fl := range fls.FlowsStarts {
 					if textMessage == fl.Name {
-						payload.Messages[0].Text.Body = fl.Keyword
+						keyword = fl.Keyword
 						hasKeyword = true
 						break
 					}
@@ -194,7 +194,7 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 						} "json:\"interactive,omitempty\""
 					}{From: payload.Messages[0].From, ID: payload.Messages[0].ID, Text: struct {
 						Body string "json:\"body\""
-					}{payload.Messages[0].Interactive.ButtonReply.Title}, Timestamp: payload.Messages[0].Timestamp, Type: "text"})
+					}{keyword}, Timestamp: payload.Messages[0].Timestamp, Type: "text"})
 
 					payloadBytes, err := json.Marshal(payloadInteractive)
 					if err != nil {
@@ -322,18 +322,6 @@ func (h *WhatsappHandler) HandlePostMedia(w http.ResponseWriter, r *http.Request
 	res.Body.Close()
 }
 
-// func (h *WhatsappHandler) sendTokenConfirmation(contact *models.Contact) (http.Header, io.ReadCloser, error) {
-// 	urn := contact.URN
-// 	payload := fmt.Sprintf(
-// 		`{"to":"%s","type":"text","text":{"body":"%s"}}`,
-// 		urn,
-// 		confirmationMessage,
-// 	)
-// 	payloadBytes := []byte(payload)
-
-// 	return h.WhatsappService.SendMessage(payloadBytes)
-// }
-
 func (h *WhatsappHandler) sendFlowsChoice(channel *models.Channel, contact *models.Contact) (http.Header, io.ReadCloser, error) {
 	urn := contact.URN
 
@@ -353,7 +341,7 @@ func (h *WhatsappHandler) sendFlowsChoice(channel *models.Channel, contact *mode
 			"interactive":{
 				"type":"button",
 				"body":{
-					"text": "Escolha abaixo qual fluxo deseja iniciar."
+					"text": "%s"
 				},	
 				"action": {
 					"buttons": [
@@ -383,6 +371,7 @@ func (h *WhatsappHandler) sendFlowsChoice(channel *models.Channel, contact *mode
 			}
 		}`,
 		urn,
+		welcomeMessage,
 		fl.FlowsStarts[0].Name,
 		fl.FlowsStarts[0].Name,
 		fl.FlowsStarts[1].Name,
