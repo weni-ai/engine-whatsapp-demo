@@ -173,7 +173,30 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 				channelUUID := channel.UUID
 				var status int
 				if hasKeyword {
-					payloadBytes, err := json.Marshal(payload)
+					payloadInteractive := &eventPayload{
+						Contacts: payload.Contacts,
+					}
+
+					payloadInteractive.Messages = append(payloadInteractive.Messages, struct {
+						From      string "json:\"from\"      validate:\"required\""
+						ID        string "json:\"id\"        validate:\"required\""
+						Timestamp string "json:\"timestamp\" validate:\"required\""
+						Type      string "json:\"type\"      validate:\"required\""
+						Text      struct {
+							Body string "json:\"body\""
+						} "json:\"text\""
+						Interactive struct {
+							ButtonReply struct {
+								ID    string "json:\"id\""
+								Title string "json:\"title\""
+							} "json:\"button_reply\""
+							Type string "json:\"type\""
+						} "json:\"interactive,omitempty\""
+					}{From: payload.Messages[0].From, ID: payload.Messages[0].ID, Text: struct {
+						Body string "json:\"body\""
+					}{payload.Messages[0].Interactive.ButtonReply.Title}, Timestamp: payload.Messages[0].Timestamp, Type: "text"})
+
+					payloadBytes, err := json.Marshal(payloadInteractive)
 					if err != nil {
 						logger.Debug(err.Error())
 					}
@@ -393,6 +416,6 @@ type eventPayload struct {
 				Title string `json:"title"`
 			} `json:"button_reply"`
 			Type string `json:"type"`
-		}
+		} `json:"interactive,omitempty"`
 	}
 }
