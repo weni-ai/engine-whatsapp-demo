@@ -3,6 +3,7 @@ package services
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -109,6 +110,7 @@ func (ws DefaultWhatsappService) GetMedia(header http.Header, mediaID string) (*
 		return nil, err
 	}
 	utils.CopyHeader(req.Header, header)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", config.GetAuthToken()))
 	return httpClient.Do(req)
 }
 
@@ -125,6 +127,7 @@ func (ws DefaultWhatsappService) PostMedia(header http.Header, body io.ReadClose
 		return nil, err
 	}
 	utils.CopyHeader(req.Header, header)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", config.GetAuthToken()))
 	return httpClient.Do(req)
 }
 
