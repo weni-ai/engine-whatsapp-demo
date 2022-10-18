@@ -1,3 +1,7 @@
+v1.2.3
+---------- 
+ * Fix bug of downloading files in WhatsApp Demo channels #24
+
 v1.2.2
 ---------- 
  * Add welcome message as environment variable #21
