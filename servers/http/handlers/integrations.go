@@ -9,6 +9,7 @@ import (
 
 	"github.com/Nerzal/gocloak/v11"
 	"github.com/weni/whatsapp-router/config"
+	"github.com/weni/whatsapp-router/logger"
 	"github.com/weni/whatsapp-router/models"
 	"github.com/weni/whatsapp-router/services"
 	"github.com/weni/whatsapp-router/utils"
@@ -80,9 +81,22 @@ func (h *IntegrationsHandler) HandleInitialProjectFlows(w http.ResponseWriter, r
 		return
 	}
 
-	_, err = h.FlowsService.CreateFlows(flows)
+	fl, err := h.FlowsService.FindFlows(flows)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		logger.Debug(err.Error())
 	}
+
+	if fl != nil {
+		_, err = h.FlowsService.UpdateFlows(flows)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	} else {
+		_, err = h.FlowsService.CreateFlows(flows)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	}
+
 	w.WriteHeader(http.StatusCreated)
 }

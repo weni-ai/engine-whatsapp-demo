@@ -99,7 +99,22 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
 				}
-				_, b, err := h.sendFlowsChoice(channelFromToken, contact)
+				flows := &models.Flows{
+					Channel: channelFromToken.UUID,
+				}
+
+				fl, err := h.FlowsService.FindFlows(flows)
+				if err != nil {
+					logger.Debug(err.Error())
+				}
+
+				var b io.ReadCloser
+				if fl != nil {
+					_, b, err = h.sendFlowsChoice(channelFromToken, contact)
+				} else {
+					_, b, err = h.sendTokenConfirmation(contact)
+				}
+
 				if err != nil {
 					logger.Error(err.Error())
 					w.WriteHeader(http.StatusInternalServerError)
@@ -126,7 +141,23 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
 				}
-				_, b, err := h.sendFlowsChoice(channelFromToken, contact)
+
+				flows := &models.Flows{
+					Channel: channelFromToken.UUID,
+				}
+
+				fl, err := h.FlowsService.FindFlows(flows)
+				if err != nil {
+					logger.Debug(err.Error())
+				}
+
+				var b io.ReadCloser
+				if fl != nil {
+					_, b, err = h.sendFlowsChoice(channelFromToken, contact)
+				} else {
+					_, b, err = h.sendTokenConfirmation(contact)
+				}
+
 				if err != nil {
 					logger.Error(err.Error())
 					http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -342,42 +373,40 @@ func (h *WhatsappHandler) sendFlowsChoice(channel *models.Channel, contact *mode
 				"type":"button",
 				"body":{
 					"text": "%s"
-				},	
-				"action": {
-					"buttons": [
-						{
-							"type": "reply",
-							"reply": {
-								"id": "%s",
-								"title": "%s" 
-							}
-						},
-						{
-							"type": "reply",
-							"reply": {
-								"id": "%s",
-								"title": "%s" 
-							}
-						},
-						{
-							"type": "reply",
-							"reply": {
-								"id": "%s",
-								"title": "%s" 
-							}
-						}
-					] 
-				}
-			}
-		}`,
+				},`,
 		urn,
 		welcomeMessage,
-		fl.FlowsStarts[0].Name,
-		fl.FlowsStarts[0].Name,
-		fl.FlowsStarts[1].Name,
-		fl.FlowsStarts[1].Name,
-		fl.FlowsStarts[2].Name,
-		fl.FlowsStarts[2].Name,
+	)
+
+	if len(fl.FlowsStarts) > 0 {
+		payload = payload + `"action": { "buttons": [`
+		for i, f := range fl.FlowsStarts {
+			payload = payload + fmt.Sprintf(`
+					{
+						"type": "reply",
+						"reply": {
+							"id": "%s",
+							"title": "%s" 
+						}
+					}`, f.Name, f.Name)
+			if i != len(fl.FlowsStarts)-1 {
+				payload = payload + `,`
+			}
+		}
+		payload = payload + `]}}}`
+	}
+
+	payloadBytes := []byte(payload)
+
+	return h.WhatsappService.SendMessage(payloadBytes)
+}
+
+func (h *WhatsappHandler) sendTokenConfirmation(contact *models.Contact) (http.Header, io.ReadCloser, error) {
+	urn := contact.URN
+	payload := fmt.Sprintf(
+		`{"to":"%s","type":"text","text":{"body":"%s"}}`,
+		urn,
+		welcomeMessage,
 	)
 	payloadBytes := []byte(payload)
 
