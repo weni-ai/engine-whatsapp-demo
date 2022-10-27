@@ -61,44 +61,54 @@ var incomingDummyContact = &models.Contact{
 	Name: "Dummy",
 }
 
+func TestContactTokenConfirmation(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	payload := fmt.Sprintf(
+		`{"to":"%s","type":"text","text":{"body":"%s"}}`,
+		dummyContact.URN,
+		welcomeMessage,
+	)
+	incomingRequest := `{"contacts":[{"profile":{"name":"Dummy"},"wa_id":"12341341234"}],"messages":[{"from":"5582988887777","id":"123456","text":{"body":"weni-demo-44a2m17t0x"},"timestamp":"623123123123","type":"text"}]}`
+
+	metricService, err := metric.NewPrometheusService()
+	assert.NoError(t, err)
+
+	mockChannelService := mocks.NewMockChannelService(ctrl)
+	mockContactService := mocks.NewMockContactService(ctrl)
+	mockCourierService := mocks.NewMockCourierService(ctrl)
+	mockWhatsappService := mocks.NewMockWhatsappService(ctrl)
+	mockConfigService := mocks.NewMockConfigService(ctrl)
+	mockFlowsService := mocks.NewMockFlowsService(ctrl)
+	mockChannelService.EXPECT().FindChannelByToken(dummyChannel.Token).Return(dummyChannel, nil)
+	mockContactService.EXPECT().FindContact(incomingDummyContact).Return(nil, errors.New("contact not found"))
+	mockContactService.EXPECT().CreateContact(dummyContact).Return(dummyContact, nil)
+	mockFlowsService.EXPECT().FindFlows(flows).Return(nil, nil)
+	mockWhatsappService.EXPECT().SendMessage([]byte(payload)).Return(
+		http.Header{"content-type": {"application/json"}},
+		io.NopCloser(bytes.NewReader([]byte(`{"messages":{"id":"gBEGVYKZRIIyAgmiTgezkroUL2Q"}],"meta":{"api_status":"stable","version":"2.35.2"}}`))),
+		nil,
+	)
+
+	wh := WhatsappHandler{mockContactService, mockChannelService, mockCourierService, mockWhatsappService, mockConfigService, metricService, mockFlowsService}
+	router := chi.NewRouter()
+	router.Post("/wr/receive/", wh.HandleIncomingRequests)
+	request, _ := http.NewRequest(
+		http.MethodPost,
+		"/wr/receive/",
+		strings.NewReader(incomingRequest))
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	assert.Equal(t, response.Code, 200)
+}
+
 func TestContactSendFlowsChoice(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	payloadFlows := fmt.Sprintf(
-		`{
-			"to":"%s",
-			"type":"interactive",
-			"interative":{
-				"type":"button",
-				"body":"Escolha abaixo qual fluxo deseja iniciar.",
-				"action": {
-					"buttons": [
-						{
-							"type": "reply",
-							"reply": {
-							"id": "%s",
-							"title": "%s" 
-							}
-						},
-						{
-							"type": "reply",
-							"reply": {
-							"id": "%s",
-							"title": "%s" 
-							}
-						},
-						{
-							"type": "reply",
-							"reply": {
-							"id": "%s",
-							"title": "%s" 
-							}
-						}
-					] 
-				}
-			}
-		}`,
+		`{"to":"%s","type":"interactive","interactive":{"type":"button","body":{"text": "Olá, bem vindo ao WhatsApp Demo, escolha um dos fluxos abaixo para iniciar."},"action":{"buttons":[{"type": "reply","reply": {"id": "%s","title": "%s"}},{"type": "reply","reply": {"id": "%s","title": "%s"}},{"type": "reply","reply": {"id": "%s","title": "%s"}}]}}}`,
 		dummyContact.URN,
 		fl.FlowsStarts[0].Name,
 		fl.FlowsStarts[0].Name,
@@ -196,39 +206,7 @@ func TestContactTokenUpdate(t *testing.T) {
 	}
 
 	payloadFlows := fmt.Sprintf(
-		`{
-			"to":"%s",
-			"type":"interactive",
-			"interative":{
-				"type":"button",
-				"body":"Escolha abaixo qual fluxo deseja iniciar.",
-				"action": {
-					"buttons": [
-						{
-							"type": "reply",
-							"reply": {
-							"id": "%s",
-							"title": "%s" 
-							}
-						},
-						{
-							"type": "reply",
-							"reply": {
-							"id": "%s",
-							"title": "%s" 
-							}
-						},
-						{
-							"type": "reply",
-							"reply": {
-							"id": "%s",
-							"title": "%s" 
-							}
-						}
-					] 
-				}
-			}
-		}`,
+		`{"to":"%s","type":"interactive","interactive":{"type":"button","body":{"text": "Olá, bem vindo ao WhatsApp Demo, escolha um dos fluxos abaixo para iniciar."},"action":{"buttons":[{"type": "reply","reply": {"id": "%s","title": "%s"}},{"type": "reply","reply": {"id": "%s","title": "%s"}},{"type": "reply","reply": {"id": "%s","title": "%s"}}]}}}`,
 		dummyUpdatedContact.URN,
 		fl.FlowsStarts[0].Name,
 		fl.FlowsStarts[0].Name,

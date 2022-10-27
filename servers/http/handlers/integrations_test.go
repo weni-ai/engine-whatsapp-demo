@@ -305,6 +305,7 @@ func TestHandleInitialProjectFlows(t *testing.T) {
 	ih := IntegrationsHandler{mockChannelService{}, mockFlowsService}
 	router := chi.NewRouter()
 	router.Post("/v1/flows", ih.HandleInitialProjectFlows)
+	mockFlowsService.EXPECT().FindFlows(DummyFl).Return(nil, nil)
 	request, err := http.NewRequest(
 		http.MethodPost,
 		"/v1/flows",

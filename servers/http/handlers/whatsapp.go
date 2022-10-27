@@ -110,7 +110,7 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 
 				var b io.ReadCloser
 				if fl != nil {
-					_, b, err = h.sendFlowsChoice(channelFromToken, contact)
+					_, b, err = h.sendFlowsChoice(channelFromToken, contact, fl)
 				} else {
 					_, b, err = h.sendTokenConfirmation(contact)
 				}
@@ -153,7 +153,7 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 
 				var b io.ReadCloser
 				if fl != nil {
-					_, b, err = h.sendFlowsChoice(channelFromToken, contact)
+					_, b, err = h.sendFlowsChoice(channelFromToken, contact, fl)
 				} else {
 					_, b, err = h.sendTokenConfirmation(contact)
 				}
@@ -353,49 +353,29 @@ func (h *WhatsappHandler) HandlePostMedia(w http.ResponseWriter, r *http.Request
 	res.Body.Close()
 }
 
-func (h *WhatsappHandler) sendFlowsChoice(channel *models.Channel, contact *models.Contact) (http.Header, io.ReadCloser, error) {
+func (h *WhatsappHandler) sendFlowsChoice(channel *models.Channel, contact *models.Contact, fl *models.Flows) (http.Header, io.ReadCloser, error) {
+	welcomeMessageFlows := "Olá, bem vindo ao WhatsApp Demo, escolha um dos fluxos abaixo para iniciar."
 	urn := contact.URN
 
-	flows := &models.Flows{
-		Channel: channel.UUID,
-	}
-
-	fl, err := h.FlowsService.FindFlows(flows)
-	if err != nil {
-		logger.Debug(err.Error())
-	}
-
 	payload := fmt.Sprintf(
-		`{
-			"to":"%s",
-			"type":"interactive",
-			"interactive":{
-				"type":"button",
-				"body":{
-					"text": "%s"
-				},`,
+		`{"to":"%s","type":"interactive","interactive":{"type":"button","body":{"text": "%s"},`,
 		urn,
-		welcomeMessage,
+		welcomeMessageFlows,
 	)
 
 	if len(fl.FlowsStarts) > 0 {
-		payload = payload + `"action": { "buttons": [`
+		payload = payload + `"action":{"buttons":[`
+
 		for i, f := range fl.FlowsStarts {
-			payload = payload + fmt.Sprintf(`
-					{
-						"type": "reply",
-						"reply": {
-							"id": "%s",
-							"title": "%s" 
-						}
-					}`, f.Name, f.Name)
+			payload = payload + fmt.Sprintf(`{"type": "reply","reply": {"id": "%s","title": "%s"}}`, f.Name, f.Name)
 			if i != len(fl.FlowsStarts)-1 {
 				payload = payload + `,`
 			}
 		}
-		payload = payload + `]}}}`
+		payload = payload + `]}`
 	}
 
+	payload = payload + `}}`
 	payloadBytes := []byte(payload)
 
 	return h.WhatsappService.SendMessage(payloadBytes)
