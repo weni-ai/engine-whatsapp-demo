@@ -76,8 +76,8 @@ func (h *IntegrationsHandler) HandleInitialProjectFlows(w http.ResponseWriter, r
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if flows.Channel == "" || flows.FlowsStarts == nil {
-		http.Error(w, "channel uuid or flows list could not be empty", http.StatusBadRequest)
+	if flows.Channel == "" {
+		http.Error(w, "channel uuid could not be empty", http.StatusBadRequest)
 		return
 	}
 

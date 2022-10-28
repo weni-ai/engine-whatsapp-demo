@@ -48,7 +48,7 @@ func (f FlowsRepositoryDb) FindOne(flows *models.Flows) (*models.Flows, error) {
 
 func (f FlowsRepositoryDb) Update(flows *models.Flows) (*models.Flows, error) {
 	q := bson.M{
-		"flows_starts": flows.FlowsStarts,
+		"channel_uuid": flows.Channel,
 	}
 	d, err := bson.Marshal(flows)
 	if err != nil {

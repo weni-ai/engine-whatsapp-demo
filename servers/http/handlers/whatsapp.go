@@ -109,7 +109,7 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 				}
 
 				var b io.ReadCloser
-				if fl != nil {
+				if fl != nil && len(fl.FlowsStarts) > 0 {
 					_, b, err = h.sendFlowsChoice(channelFromToken, contact, fl)
 				} else {
 					_, b, err = h.sendTokenConfirmation(contact)
@@ -152,7 +152,7 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 				}
 
 				var b io.ReadCloser
-				if fl != nil {
+				if fl != nil && len(fl.FlowsStarts) > 0 {
 					_, b, err = h.sendFlowsChoice(channelFromToken, contact, fl)
 				} else {
 					_, b, err = h.sendTokenConfirmation(contact)
@@ -358,24 +358,19 @@ func (h *WhatsappHandler) sendFlowsChoice(channel *models.Channel, contact *mode
 	urn := contact.URN
 
 	payload := fmt.Sprintf(
-		`{"to":"%s","type":"interactive","interactive":{"type":"button","body":{"text": "%s"},`,
+		`{"to":"%s","type":"interactive","interactive":{"type":"button","body":{"text": "%s"},"action":{"buttons":[`,
 		urn,
 		welcomeMessageFlows,
 	)
 
-	if len(fl.FlowsStarts) > 0 {
-		payload = payload + `"action":{"buttons":[`
-
-		for i, f := range fl.FlowsStarts {
-			payload = payload + fmt.Sprintf(`{"type": "reply","reply": {"id": "%s","title": "%s"}}`, f.Name, f.Name)
-			if i != len(fl.FlowsStarts)-1 {
-				payload = payload + `,`
-			}
+	for i, f := range fl.FlowsStarts {
+		payload = payload + fmt.Sprintf(`{"type": "reply","reply": {"id": "%s","title": "%s"}}`, f.Name, f.Name)
+		if i != len(fl.FlowsStarts)-1 {
+			payload = payload + `,`
 		}
-		payload = payload + `]}`
 	}
+	payload = payload + `]}}}`
 
-	payload = payload + `}}`
 	payloadBytes := []byte(payload)
 
 	return h.WhatsappService.SendMessage(payloadBytes)
