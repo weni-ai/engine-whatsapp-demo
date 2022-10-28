@@ -5,7 +5,7 @@ import "go.mongodb.org/mongo-driver/bson/primitive"
 type Flows struct {
 	ID          primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
 	Channel     string             `json:"channel_uuid,omitempty" bson:"channel_uuid,omitempty"`
-	FlowsStarts []Flow             `json:"flows_starts,omitempty" bson:"flows_starts,omitempty"`
+	FlowsStarts *[]Flow            `json:"flows_starts,omitempty" bson:"flows_starts,omitempty"`
 }
 
 type Flow struct {

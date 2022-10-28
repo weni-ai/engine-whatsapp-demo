@@ -109,7 +109,7 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 				}
 
 				var b io.ReadCloser
-				if fl != nil && len(fl.FlowsStarts) > 0 {
+				if fl != nil && len(*fl.FlowsStarts) > 0 {
 					_, b, err = h.sendFlowsChoice(channelFromToken, contact, fl)
 				} else {
 					_, b, err = h.sendTokenConfirmation(contact)
@@ -152,7 +152,7 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 				}
 
 				var b io.ReadCloser
-				if fl != nil && len(fl.FlowsStarts) > 0 {
+				if fl != nil && len(*fl.FlowsStarts) > 0 {
 					_, b, err = h.sendFlowsChoice(channelFromToken, contact, fl)
 				} else {
 					_, b, err = h.sendTokenConfirmation(contact)
@@ -194,7 +194,7 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 					logger.Debug(err.Error())
 				}
 				var keyword string
-				for _, fl := range fls.FlowsStarts {
+				for _, fl := range *fls.FlowsStarts {
 					if textMessage == fl.Name {
 						keyword = fl.Keyword
 						hasKeyword = true
@@ -363,9 +363,9 @@ func (h *WhatsappHandler) sendFlowsChoice(channel *models.Channel, contact *mode
 		welcomeMessageFlows,
 	)
 
-	for i, f := range fl.FlowsStarts {
+	for i, f := range *fl.FlowsStarts {
 		payload = payload + fmt.Sprintf(`{"type": "reply","reply": {"id": "%s","title": "%s"}}`, f.Name, f.Name)
-		if i != len(fl.FlowsStarts)-1 {
+		if i != len(*fl.FlowsStarts)-1 {
 			payload = payload + `,`
 		}
 	}

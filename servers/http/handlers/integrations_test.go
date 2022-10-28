@@ -275,7 +275,7 @@ type configGoCloak struct {
 }
 
 var DummyFl = &models.Flows{
-	FlowsStarts: []models.Flow{
+	FlowsStarts: &[]models.Flow{
 		{
 			Name:    "test_flow1",
 			UUID:    "507b6703-cc80-41fc-8a1b-cca573518dbb",

@@ -108,14 +108,8 @@ func TestContactSendFlowsChoice(t *testing.T) {
 	defer ctrl.Finish()
 
 	payloadFlows := fmt.Sprintf(
-		`{"to":"%s","type":"interactive","interactive":{"type":"button","body":{"text": "Olá, bem vindo ao WhatsApp Demo, escolha um dos fluxos abaixo para iniciar."},"action":{"buttons":[{"type": "reply","reply": {"id": "%s","title": "%s"}},{"type": "reply","reply": {"id": "%s","title": "%s"}},{"type": "reply","reply": {"id": "%s","title": "%s"}}]}}}`,
+		`{"to":"%s","type":"interactive","interactive":{"type":"button","body":{"text": "Olá, bem vindo ao WhatsApp Demo, escolha um dos fluxos abaixo para iniciar."},"action":{"buttons":[{"type": "reply","reply": {"id": "flow1","title": "flow1"}},{"type": "reply","reply": {"id": "flow2","title": "flow2"}},{"type": "reply","reply": {"id": "flow3","title": "flow3"}}]}}}`,
 		dummyContact.URN,
-		fl.FlowsStarts[0].Name,
-		fl.FlowsStarts[0].Name,
-		fl.FlowsStarts[1].Name,
-		fl.FlowsStarts[1].Name,
-		fl.FlowsStarts[2].Name,
-		fl.FlowsStarts[2].Name,
 	)
 	incomingRequest := `{"contacts":[{"profile":{"name":"Dummy"},"wa_id":"12341341234"}],"messages":[{"from":"5582988887777","id":"123456","text":{"body":"weni-demo-44a2m17t0x"},"timestamp":"623123123123","type":"text"}]}`
 
@@ -206,14 +200,8 @@ func TestContactTokenUpdate(t *testing.T) {
 	}
 
 	payloadFlows := fmt.Sprintf(
-		`{"to":"%s","type":"interactive","interactive":{"type":"button","body":{"text": "Olá, bem vindo ao WhatsApp Demo, escolha um dos fluxos abaixo para iniciar."},"action":{"buttons":[{"type": "reply","reply": {"id": "%s","title": "%s"}},{"type": "reply","reply": {"id": "%s","title": "%s"}},{"type": "reply","reply": {"id": "%s","title": "%s"}}]}}}`,
+		`{"to":"%s","type":"interactive","interactive":{"type":"button","body":{"text": "Olá, bem vindo ao WhatsApp Demo, escolha um dos fluxos abaixo para iniciar."},"action":{"buttons":[{"type": "reply","reply": {"id": "flow1","title": "flow1"}},{"type": "reply","reply": {"id": "flow2","title": "flow2"}},{"type": "reply","reply": {"id": "flow3","title": "flow3"}}]}}}`,
 		dummyUpdatedContact.URN,
-		fl.FlowsStarts[0].Name,
-		fl.FlowsStarts[0].Name,
-		fl.FlowsStarts[1].Name,
-		fl.FlowsStarts[1].Name,
-		fl.FlowsStarts[2].Name,
-		fl.FlowsStarts[2].Name,
 	)
 
 	incomingRequest := `{"contacts":[{"profile":{"name":"Dummy"},"wa_id":"12341341234"}],"messages":[{"from":"5582988887777","id":"123456","text":{"body":"weni-demo-1234567890"},"timestamp":"623123123123","type":"text"}]}`
@@ -400,7 +388,7 @@ var flows = &models.Flows{
 
 var fl = &models.Flows{
 	Channel: dummyChannel.UUID,
-	FlowsStarts: []models.Flow{
+	FlowsStarts: &[]models.Flow{
 		{
 			Name:    "flow1",
 			UUID:    "b23662c3-935b-4748-b715-b62a44e9d228",
@@ -425,7 +413,7 @@ var flowsUpdate = &models.Flows{
 
 var flUpdate = &models.Flows{
 	Channel: dummyChannel2.UUID,
-	FlowsStarts: []models.Flow{
+	FlowsStarts: &[]models.Flow{
 		{
 			Name:    "flow1",
 			UUID:    "b23662c3-935b-4748-b715-b62a44e9d228",
