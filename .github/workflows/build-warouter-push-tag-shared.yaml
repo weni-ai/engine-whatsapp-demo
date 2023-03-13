@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - '*.*.*-develop'
+      - '*.*.*-staging'
+      - '*.*.*'
 
 jobs:
   docker:
@@ -53,7 +55,7 @@ jobs:
           username: ${{ secrets.AWS_ACCESS_KEY_ID_SHARED }}      
           password: ${{ secrets.AWS_SECRET_ACCESS_KEY_SHARED }}
 
-      - name: Build and push - Indexer Image
+      - name: Build and push - WhatsApp Router Image
         uses: docker/build-push-action@v3
         with:
           context: .
