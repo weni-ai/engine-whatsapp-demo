@@ -19,7 +19,7 @@ import (
 	"github.com/weni/whatsapp-router/utils"
 )
 
-var confirmationMessage = config.GetConfig().Whatsapp.WelcomeMessage
+var welcomeMessage = config.GetConfig().Whatsapp.WelcomeMessage
 
 const tokenPrefix = "weni-demo"
 
@@ -30,6 +30,7 @@ type WhatsappHandler struct {
 	WhatsappService services.WhatsappService
 	ConfigService   services.ConfigService
 	Metrics         *metric.Service
+	FlowsService    services.FlowsService
 }
 
 func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.Request) {
@@ -73,6 +74,8 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 	textMessage := ""
 	if payload.Messages[0].Type == "text" {
 		textMessage = payload.Messages[0].Text.Body
+	} else if payload.Messages[0].Type == "interactive" {
+		textMessage = payload.Messages[0].Interactive.ButtonReply.Title
 	}
 
 	if textMessage != "" && strings.Contains(textMessage, tokenPrefix) {
@@ -96,7 +99,22 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
 				}
-				_, b, err := h.sendTokenConfirmation(contact)
+				flows := &models.Flows{
+					Channel: channelFromToken.UUID,
+				}
+
+				fl, err := h.FlowsService.FindFlows(flows)
+				if err != nil {
+					logger.Debug(err.Error())
+				}
+
+				var b io.ReadCloser
+				if fl != nil && len(*fl.FlowsStarts) > 0 {
+					_, b, err = h.sendFlowsChoice(channelFromToken, contact, fl)
+				} else {
+					_, b, err = h.sendTokenConfirmation(contact)
+				}
+
 				if err != nil {
 					logger.Error(err.Error())
 					w.WriteHeader(http.StatusInternalServerError)
@@ -117,13 +135,29 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 
 				return
 			} else {
-				_, err := h.ContactService.CreateContact(incomingContact)
+				contact, err := h.ContactService.CreateContact(incomingContact)
 				if err != nil {
 					logger.Error(err.Error())
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
 				}
-				_, b, err := h.sendTokenConfirmation(incomingContact)
+
+				flows := &models.Flows{
+					Channel: channelFromToken.UUID,
+				}
+
+				fl, err := h.FlowsService.FindFlows(flows)
+				if err != nil {
+					logger.Debug(err.Error())
+				}
+
+				var b io.ReadCloser
+				if fl != nil && len(*fl.FlowsStarts) > 0 {
+					_, b, err = h.sendFlowsChoice(channelFromToken, contact, fl)
+				} else {
+					_, b, err = h.sendTokenConfirmation(contact)
+				}
+
 				if err != nil {
 					logger.Error(err.Error())
 					http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -132,12 +166,12 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 				body, _ := ioutil.ReadAll(b)
 				b.Close()
 				logger.Debug(string(body))
-				w.WriteHeader(http.StatusOK)
 
 				contactActivation := metric.NewContactActivation(channelFromToken.UUID)
 				h.Metrics.SaveContactActivation(contactActivation)
 				contactActivated := metric.NewContactActivated(channelFromToken.UUID)
 				h.Metrics.IncContactActivated(contactActivated)
+
 				return
 			}
 		}
@@ -148,15 +182,72 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 			if err != nil {
 				logger.Debug(err.Error())
 			}
+			hasKeyword := false
 			if channel != nil {
-				channelUUID := channel.UUID
-				status, err := h.CourierService.RedirectMessage(channelUUID, string(incomingWebhookEvent))
+
+				flows := &models.Flows{
+					Channel: channel.UUID,
+				}
+
+				fls, err := h.FlowsService.FindFlows(flows)
 				if err != nil {
 					logger.Debug(err.Error())
-					w.WriteHeader(status)
-					fmt.Fprint(w, err)
-					return
 				}
+				var keyword string
+				for _, fl := range *fls.FlowsStarts {
+					if textMessage == fl.Name {
+						keyword = fl.Keyword
+						hasKeyword = true
+						break
+					}
+				}
+				channelUUID := channel.UUID
+				var status int
+				if hasKeyword {
+					payloadInteractive := &eventPayload{
+						Contacts: payload.Contacts,
+					}
+
+					payloadInteractive.Messages = append(payloadInteractive.Messages, struct {
+						From      string "json:\"from\"      validate:\"required\""
+						ID        string "json:\"id\"        validate:\"required\""
+						Timestamp string "json:\"timestamp\" validate:\"required\""
+						Type      string "json:\"type\"      validate:\"required\""
+						Text      struct {
+							Body string "json:\"body\""
+						} "json:\"text\""
+						Interactive struct {
+							ButtonReply struct {
+								ID    string "json:\"id\""
+								Title string "json:\"title\""
+							} "json:\"button_reply\""
+							Type string "json:\"type\""
+						} "json:\"interactive,omitempty\""
+					}{From: payload.Messages[0].From, ID: payload.Messages[0].ID, Text: struct {
+						Body string "json:\"body\""
+					}{keyword}, Timestamp: payload.Messages[0].Timestamp, Type: "text"})
+
+					payloadBytes, err := json.Marshal(payloadInteractive)
+					if err != nil {
+						logger.Debug(err.Error())
+					}
+					status, err = h.CourierService.RedirectMessage(channelUUID, string(payloadBytes))
+					if err != nil {
+						logger.Debug(err.Error())
+						w.WriteHeader(status)
+						fmt.Fprint(w, err)
+						return
+					}
+				} else {
+					status, err = h.CourierService.RedirectMessage(channelUUID, string(incomingWebhookEvent))
+					if err != nil {
+						logger.Debug(err.Error())
+						w.WriteHeader(status)
+						fmt.Fprint(w, err)
+						return
+					}
+				}
+
 				if status >= 400 {
 					logger.Debug(fmt.Sprintf("message redirect with status %d for channel %s", status, channelUUID))
 					return
@@ -262,12 +353,35 @@ func (h *WhatsappHandler) HandlePostMedia(w http.ResponseWriter, r *http.Request
 	res.Body.Close()
 }
 
+func (h *WhatsappHandler) sendFlowsChoice(channel *models.Channel, contact *models.Contact, fl *models.Flows) (http.Header, io.ReadCloser, error) {
+	welcomeMessageFlows := "Olá, bem vindo ao WhatsApp Demo, escolha um dos fluxos abaixo para iniciar."
+	urn := contact.URN
+
+	payload := fmt.Sprintf(
+		`{"to":"%s","type":"interactive","interactive":{"type":"button","body":{"text": "%s"},"action":{"buttons":[`,
+		urn,
+		welcomeMessageFlows,
+	)
+
+	for i, f := range *fl.FlowsStarts {
+		payload = payload + fmt.Sprintf(`{"type": "reply","reply": {"id": "%s","title": "%s"}}`, f.Name, f.Name)
+		if i != len(*fl.FlowsStarts)-1 {
+			payload = payload + `,`
+		}
+	}
+	payload = payload + `]}}}`
+
+	payloadBytes := []byte(payload)
+
+	return h.WhatsappService.SendMessage(payloadBytes)
+}
+
 func (h *WhatsappHandler) sendTokenConfirmation(contact *models.Contact) (http.Header, io.ReadCloser, error) {
 	urn := contact.URN
 	payload := fmt.Sprintf(
 		`{"to":"%s","type":"text","text":{"body":"%s"}}`,
 		urn,
-		confirmationMessage,
+		welcomeMessage,
 	)
 	payloadBytes := []byte(payload)
 
@@ -289,5 +403,12 @@ type eventPayload struct {
 		Text      struct {
 			Body string `json:"body"`
 		} `json:"text"`
+		Interactive struct {
+			ButtonReply struct {
+				ID    string `json:"id"`
+				Title string `json:"title"`
+			} `json:"button_reply"`
+			Type string `json:"type"`
+		} `json:"interactive,omitempty"`
 	}
 }

@@ -22,9 +22,11 @@ import (
 	"github.com/Nerzal/gocloak/v11"
 	"github.com/go-chi/chi"
 	"github.com/go-resty/resty/v2"
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/weni/whatsapp-router/config"
+	mocks "github.com/weni/whatsapp-router/mocks/services"
 	"github.com/weni/whatsapp-router/models"
 	"github.com/weni/whatsapp-router/servers/grpc/pb"
 )
@@ -32,7 +34,11 @@ import (
 func TestHandleCreateChannel(t *testing.T) {
 	dummyPayload := `{"uuid":"425b41f0-c554-4943-989c-5f88561a0cf5","name":"test-channel"}`
 
-	ih := IntegrationsHandler{mockChannelService{}}
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mockFlowsService := mocks.NewMockFlowsService(ctrl)
+
+	ih := IntegrationsHandler{mockChannelService{}, mockFlowsService}
 	router := chi.NewRouter()
 	router.Post("/v1/channels", ih.HandleCreateChannel)
 	request, err := http.NewRequest(
@@ -266,4 +272,48 @@ type configGoCloak struct {
 	Realm        string `json:"realm"`
 	ClientID     string `json:"client_id"`
 	ClientSecret string `json:"client_secret"`
+}
+
+var DummyFl = &models.Flows{
+	FlowsStarts: &[]models.Flow{
+		{
+			Name:    "test_flow1",
+			UUID:    "507b6703-cc80-41fc-8a1b-cca573518dbb",
+			Keyword: "hello1",
+		},
+		{
+			Name:    "test_flow2",
+			UUID:    "a76b3106-5e3d-462d-a0fc-4817c0d73ce7",
+			Keyword: "hello2",
+		},
+		{
+			Name:    "test_flow3",
+			UUID:    "d7c97de5-bd06-4d7f-904f-63a7f8dd6b9d",
+			Keyword: "hello3",
+		},
+	},
+	Channel: "1d514cf1-a829-415d-8955-748563e173cf",
+}
+
+func TestHandleInitialProjectFlows(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	dummyPayload := `{"channel_uuid":` + `"` + DummyFl.Channel + `"` + `,"flows_starts":[{"flow_name":"test_flow1","flow_uuid":"507b6703-cc80-41fc-8a1b-cca573518dbb","keyword":"hello1"},{"flow_name":"test_flow2","flow_uuid":"a76b3106-5e3d-462d-a0fc-4817c0d73ce7","keyword":"hello2"},{"flow_name":"test_flow3","flow_uuid":"d7c97de5-bd06-4d7f-904f-63a7f8dd6b9d","keyword":"hello3"}]}`
+
+	mockFlowsService := mocks.NewMockFlowsService(ctrl)
+	ih := IntegrationsHandler{mockChannelService{}, mockFlowsService}
+	router := chi.NewRouter()
+	router.Post("/v1/flows", ih.HandleInitialProjectFlows)
+	mockFlowsService.EXPECT().FindFlows(DummyFl).Return(nil, nil)
+	request, err := http.NewRequest(
+		http.MethodPost,
+		"/v1/flows",
+		bytes.NewReader([]byte(dummyPayload)),
+	)
+	mockFlowsService.EXPECT().CreateFlows(DummyFl).Return(DummyFl, nil)
+	assert.NoError(t, err)
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	assert.Equal(t, 201, response.Code)
 }

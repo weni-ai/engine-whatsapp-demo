@@ -24,7 +24,7 @@ func (cs DefaultCourierService) RedirectMessage(channelUUID string, msg string) 
 		bytes.NewBuffer([]byte(msg)))
 
 	if err != nil {
-		return resp.StatusCode, err
+		return 500, err
 	}
 
 	return resp.StatusCode, nil
