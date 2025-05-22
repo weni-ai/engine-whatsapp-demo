@@ -43,8 +43,8 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 		return
 	}
 
-	payload := &eventPayload{}
-	if err = json.Unmarshal(incomingWebhookEvent, &payload); err != nil {
+	payload, err := h.parseEventPayload(incomingWebhookEvent)
+	if err != nil {
 		logger.Error(fmt.Sprintf("unable to parse request body: %s", err))
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprint(w, err.Error())
@@ -56,6 +56,38 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 		return
 	}
 
+	contact := h.getOrCreateContact(payload)
+	textMessage := h.getMessageText(payload)
+
+	// Handle token-based channel registration/update
+	if textMessage != "" && strings.Contains(textMessage, tokenPrefix) {
+		h.handleTokenMessage(w, contact, textMessage, payload)
+		return
+	}
+
+	// Handle regular message routing
+	if contact != nil {
+		h.routeMessage(w, contact, incomingWebhookEvent)
+		return
+	}
+
+	//returning status ok to avoid retry send mechanisms if contact not exists or token is not valid
+	logger.Debug("contact not found and token not valid")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprint(w, errors.New("contact not found and token not valid"))
+}
+
+// Helper functions for HandleIncomingRequests
+
+func (h *WhatsappHandler) parseEventPayload(data []byte) (*eventPayload, error) {
+	payload := &eventPayload{}
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return nil, err
+	}
+	return payload, nil
+}
+
+func (h *WhatsappHandler) getOrCreateContact(payload *eventPayload) *models.Contact {
 	cName := ""
 	if len(payload.Contacts) > 0 {
 		cName = payload.Contacts[0].Profile.Name
@@ -70,112 +102,146 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 		logger.Debug(err.Error())
 	}
 
-	textMessage := ""
+	return contact
+}
+
+func (h *WhatsappHandler) getMessageText(payload *eventPayload) string {
 	if payload.Messages[0].Type == "text" {
-		textMessage = payload.Messages[0].Text.Body
+		return payload.Messages[0].Text.Body
+	}
+	return ""
+}
+
+func (h *WhatsappHandler) handleTokenMessage(w http.ResponseWriter, contact *models.Contact, token string, payload *eventPayload) {
+	channelFromToken, err := h.ChannelService.FindChannelByToken(token)
+	if err != nil {
+		logger.Debug(err.Error())
+		w.WriteHeader(http.StatusOK)
+		return
 	}
 
-	if textMessage != "" && strings.Contains(textMessage, tokenPrefix) {
-		channelFromToken, err := h.ChannelService.FindChannelByToken(textMessage)
-		if err != nil {
-			logger.Debug(err.Error())
-		}
-		if channelFromToken != nil {
-			incomingContact.Channel = channelFromToken.ID
-			if contact != nil {
-				lastContactChannel, err := h.ChannelService.FindChannelById(contact.Channel.Hex())
-				if err != nil {
-					logger.Error(err.Error())
-					http.Error(w, err.Error(), http.StatusInternalServerError)
-					return
-				}
-				contact.Channel = channelFromToken.ID
-				_, err = h.ContactService.UpdateContact(contact)
-				if err != nil {
-					logger.Error(err.Error())
-					http.Error(w, err.Error(), http.StatusInternalServerError)
-					return
-				}
-				_, b, err := h.sendTokenConfirmation(contact)
-				if err != nil {
-					logger.Error(err.Error())
-					w.WriteHeader(http.StatusInternalServerError)
-					return
-				}
+	if channelFromToken == nil {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 
-				body, _ := ioutil.ReadAll(b)
-				b.Close()
-				logger.Debug(string(body))
-				w.WriteHeader(http.StatusOK)
-
-				contactActivatedMetricDec := metric.NewContactActivated(lastContactChannel.UUID)
-				h.Metrics.DecContactActivated(contactActivatedMetricDec)
-				contactActivatedMetricInc := metric.NewContactActivated(lastContactChannel.UUID)
-				h.Metrics.IncContactActivated(contactActivatedMetricInc)
-				contactActivation := metric.NewContactActivation(channelFromToken.UUID)
-				h.Metrics.SaveContactActivation(contactActivation)
-
-				return
-			} else {
-				_, err := h.ContactService.CreateContact(incomingContact)
-				if err != nil {
-					logger.Error(err.Error())
-					http.Error(w, err.Error(), http.StatusInternalServerError)
-					return
-				}
-				_, b, err := h.sendTokenConfirmation(incomingContact)
-				if err != nil {
-					logger.Error(err.Error())
-					http.Error(w, err.Error(), http.StatusInternalServerError)
-					return
-				}
-				body, _ := ioutil.ReadAll(b)
-				b.Close()
-				logger.Debug(string(body))
-				w.WriteHeader(http.StatusOK)
-
-				contactActivation := metric.NewContactActivation(channelFromToken.UUID)
-				h.Metrics.SaveContactActivation(contactActivation)
-				contactActivated := metric.NewContactActivated(channelFromToken.UUID)
-				h.Metrics.IncContactActivated(contactActivated)
-				return
-			}
-		}
+	// Create a new contact or update existing one
+	if contact != nil {
+		h.updateExistingContact(w, contact, channelFromToken)
 	} else {
-		if contact != nil {
-			channelId := contact.Channel.Hex()
-			channel, err := h.ChannelService.FindChannelById(channelId)
-			if err != nil {
-				logger.Debug(err.Error())
-			}
-			if channel != nil {
-				channelUUID := channel.UUID
-				status, err := h.CourierService.RedirectMessage(channelUUID, string(incomingWebhookEvent))
-				if err != nil {
-					logger.Debug(err.Error())
-					w.WriteHeader(status)
-					fmt.Fprint(w, err)
-					return
-				}
-				if status >= 400 {
-					logger.Debug(fmt.Sprintf("message redirect with status %d for channel %s", status, channelUUID))
-					return
-				}
-				cmm := metric.NewContactMessage(channelUUID)
-				h.Metrics.SaveContactMessage(cmm)
-				w.WriteHeader(http.StatusOK)
-				return
-			}
-			logger.Debug("channel not found")
-			w.WriteHeader(http.StatusOK)
-			return
+		// Create contact from payload
+		cName := ""
+		if len(payload.Contacts) > 0 {
+			cName = payload.Contacts[0].Profile.Name
 		}
+
+		incomingContact := &models.Contact{
+			URN:     payload.Messages[0].From,
+			Name:    cName,
+			Channel: channelFromToken.ID,
+		}
+
+		h.createNewContact(w, incomingContact, channelFromToken)
+	}
+}
+
+func (h *WhatsappHandler) updateExistingContact(w http.ResponseWriter, contact *models.Contact, newChannel *models.Channel) {
+	lastContactChannel, err := h.ChannelService.FindChannelById(contact.Channel.Hex())
+	if err != nil {
+		logger.Error(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
-	//returning status ok to avoid retry send mechanisms if contact not exists or token is not valid
-	logger.Debug("contact not found and token not valid")
+	contact.Channel = newChannel.ID
+	_, err = h.ContactService.UpdateContact(contact)
+	if err != nil {
+		logger.Error(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	_, b, err := h.sendTokenConfirmation(contact)
+	if err != nil {
+		logger.Error(err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	body, _ := ioutil.ReadAll(b)
+	b.Close()
+	logger.Debug(string(body))
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprint(w, errors.New("contact not found and token not valid"))
+
+	// Update metrics
+	contactActivatedMetricDec := metric.NewContactActivated(lastContactChannel.UUID)
+	h.Metrics.DecContactActivated(contactActivatedMetricDec)
+	contactActivatedMetricInc := metric.NewContactActivated(newChannel.UUID)
+	h.Metrics.IncContactActivated(contactActivatedMetricInc)
+	contactActivation := metric.NewContactActivation(newChannel.UUID)
+	h.Metrics.SaveContactActivation(contactActivation)
+}
+
+func (h *WhatsappHandler) createNewContact(w http.ResponseWriter, contact *models.Contact, channel *models.Channel) {
+	_, err := h.ContactService.CreateContact(contact)
+	if err != nil {
+		logger.Error(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	_, b, err := h.sendTokenConfirmation(contact)
+	if err != nil {
+		logger.Error(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	body, _ := ioutil.ReadAll(b)
+	b.Close()
+	logger.Debug(string(body))
+	w.WriteHeader(http.StatusOK)
+
+	// Update metrics
+	contactActivation := metric.NewContactActivation(channel.UUID)
+	h.Metrics.SaveContactActivation(contactActivation)
+	contactActivated := metric.NewContactActivated(channel.UUID)
+	h.Metrics.IncContactActivated(contactActivated)
+}
+
+func (h *WhatsappHandler) routeMessage(w http.ResponseWriter, contact *models.Contact, message []byte) {
+	channelId := contact.Channel.Hex()
+	channel, err := h.ChannelService.FindChannelById(channelId)
+	if err != nil {
+		logger.Debug(err.Error())
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if channel == nil {
+		logger.Debug("channel not found")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	channelUUID := channel.UUID
+	status, err := h.CourierService.RedirectMessage(channelUUID, string(message))
+	if err != nil {
+		logger.Debug(err.Error())
+		w.WriteHeader(status)
+		fmt.Fprint(w, err)
+		return
+	}
+
+	if status >= 400 {
+		logger.Debug(fmt.Sprintf("message redirect with status %d for channel %s", status, channelUUID))
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	cmm := metric.NewContactMessage(channelUUID)
+	h.Metrics.SaveContactMessage(cmm)
+	w.WriteHeader(http.StatusOK)
 }
 
 func (h *WhatsappHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
