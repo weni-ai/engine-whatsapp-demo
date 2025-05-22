@@ -20,7 +20,7 @@ type Config struct {
 type App struct {
 	HttpPort       int32  `env:"APP_HTTP_PORT,default=9000"`
 	GRPCPort       int32  `env:"APP_GRPC_PORT,default=7000"`
-	CourierBaseURL string `env:"APP_COURIER_BASE_URL,default=http://localhost:8000/c/wa"`
+	CourierBaseURL string `env:"APP_COURIER_BASE_URL,default=http://localhost:8000/c/wac"`
 	SentryDSN      string `env:"APP_SENTRY_DSN"`
 	LogLevel       string `env:"APP_LOG_LEVEL,default=debug"`
 }
