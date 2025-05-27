@@ -77,6 +77,51 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 	fmt.Fprint(w, errors.New("contact not found and token not valid"))
 }
 
+func (h *WhatsappHandler) HandleIncomingRequestsWac(w http.ResponseWriter, r *http.Request) {
+	incomingWebhookEvent, err := ioutil.ReadAll(io.LimitReader(r.Body, 1000000))
+	r.Body = ioutil.NopCloser(bytes.NewBuffer(incomingWebhookEvent))
+	defer r.Body.Close()
+	if err != nil {
+		logger.Error(fmt.Sprintf("unable to read request body: %s", err))
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, err.Error())
+		return
+	}
+
+	payload, err := h.parseEventPayload(incomingWebhookEvent)
+	if err != nil {
+		logger.Error(fmt.Sprintf("unable to parse request body: %s", err))
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, err.Error())
+		return
+	}
+
+	if len(payload.Messages) <= 0 {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	contact := h.getOrCreateContact(payload)
+	textMessage := h.getMessageText(payload)
+
+	// Handle token-based channel registration/update
+	if textMessage != "" && strings.Contains(textMessage, tokenPrefix) {
+		h.handleTokenMessage(w, contact, textMessage, payload)
+		return
+	}
+
+	// Handle regular message routing
+	if contact != nil {
+		h.routeMessageWac(w, contact, incomingWebhookEvent)
+		return
+	}
+
+	//returning status ok to avoid retry send mechanisms if contact not exists or token is not valid
+	logger.Debug("contact not found and token not valid")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprint(w, errors.New("contact not found and token not valid"))
+}
+
 // Helper functions for HandleIncomingRequests
 
 func (h *WhatsappHandler) parseEventPayload(data []byte) (*eventPayload, error) {
@@ -226,6 +271,41 @@ func (h *WhatsappHandler) routeMessage(w http.ResponseWriter, contact *models.Co
 
 	channelUUID := channel.UUID
 	status, err := h.CourierService.RedirectMessage(channelUUID, string(message))
+	if err != nil {
+		logger.Debug(err.Error())
+		w.WriteHeader(status)
+		fmt.Fprint(w, err)
+		return
+	}
+
+	if status >= 400 {
+		logger.Debug(fmt.Sprintf("message redirect with status %d for channel %s", status, channelUUID))
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	cmm := metric.NewContactMessage(channelUUID)
+	h.Metrics.SaveContactMessage(cmm)
+	w.WriteHeader(http.StatusOK)
+}
+
+func (h *WhatsappHandler) routeMessageWac(w http.ResponseWriter, contact *models.Contact, message []byte) {
+	channelId := contact.Channel.Hex()
+	channel, err := h.ChannelService.FindChannelById(channelId)
+	if err != nil {
+		logger.Debug(err.Error())
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if channel == nil {
+		logger.Debug("channel not found")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	channelUUID := channel.UUID
+	status, err := h.CourierService.RedirectMessageWac(channelUUID, string(message))
 	if err != nil {
 		logger.Debug(err.Error())
 		w.WriteHeader(status)

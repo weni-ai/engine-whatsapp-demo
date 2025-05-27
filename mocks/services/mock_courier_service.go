@@ -47,3 +47,18 @@ func (mr *MockCourierServiceMockRecorder) RedirectMessage(arg0, arg1 interface{}
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RedirectMessage", reflect.TypeOf((*MockCourierService)(nil).RedirectMessage), arg0, arg1)
 }
+
+// RedirectMessageWac mocks base method.
+func (m *MockCourierService) RedirectMessageWac(arg0, arg1 string) (int, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RedirectMessageWac", arg0, arg1)
+	ret0, _ := ret[0].(int)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RedirectMessageWac indicates an expected call of RedirectMessageWac.
+func (mr *MockCourierServiceMockRecorder) RedirectMessageWac(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RedirectMessageWac", reflect.TypeOf((*MockCourierService)(nil).RedirectMessageWac), arg0, arg1)
+}
