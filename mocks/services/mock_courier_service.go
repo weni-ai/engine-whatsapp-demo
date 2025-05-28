@@ -5,6 +5,7 @@
 package mock_services
 
 import (
+	"net/http"
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
@@ -49,7 +50,7 @@ func (mr *MockCourierServiceMockRecorder) RedirectMessage(arg0, arg1 interface{}
 }
 
 // RedirectMessageWac mocks base method.
-func (m *MockCourierService) RedirectMessageWac(arg0, arg1 string) (int, error) {
+func (m *MockCourierService) RedirectMessageWac(arg0 string, arg1 *http.Request) (int, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "RedirectMessageWac", arg0, arg1)
 	ret0, _ := ret[0].(int)

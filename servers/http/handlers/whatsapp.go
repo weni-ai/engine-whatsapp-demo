@@ -113,7 +113,7 @@ func (h *WhatsappHandler) HandleIncomingRequestsWac(w http.ResponseWriter, r *ht
 
 	// Handle regular message routing
 	if contact != nil {
-		h.routeMessageWac(w, contact, incomingWebhookEvent)
+		h.routeMessageWac(w, r, contact, incomingWebhookEvent)
 		return
 	}
 
@@ -420,7 +420,7 @@ func (h *WhatsappHandler) routeMessage(w http.ResponseWriter, contact *models.Co
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h *WhatsappHandler) routeMessageWac(w http.ResponseWriter, contact *models.Contact, message []byte) {
+func (h *WhatsappHandler) routeMessageWac(w http.ResponseWriter, r *http.Request, contact *models.Contact, message []byte) {
 	channelId := contact.Channel.Hex()
 	channel, err := h.ChannelService.FindChannelById(channelId)
 	if err != nil {
@@ -436,7 +436,7 @@ func (h *WhatsappHandler) routeMessageWac(w http.ResponseWriter, contact *models
 	}
 
 	channelUUID := channel.UUID
-	status, err := h.CourierService.RedirectMessageWac(channelUUID, string(message))
+	status, err := h.CourierService.RedirectMessageWac(channelUUID, r)
 	if err != nil {
 		logger.Debug(err.Error())
 		w.WriteHeader(status)
