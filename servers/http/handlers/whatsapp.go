@@ -80,6 +80,7 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 func (h *WhatsappHandler) HandleIncomingRequestsWac(w http.ResponseWriter, r *http.Request) {
 	incomingWebhookEvent, err := ioutil.ReadAll(io.LimitReader(r.Body, 1000000))
 	r.Body = ioutil.NopCloser(bytes.NewBuffer(incomingWebhookEvent))
+	fmt.Println("incomingRequestWac", r.Body)
 	defer r.Body.Close()
 	if err != nil {
 		logger.Error(fmt.Sprintf("unable to read request body: %s", err))
@@ -95,6 +96,7 @@ func (h *WhatsappHandler) HandleIncomingRequestsWac(w http.ResponseWriter, r *ht
 		fmt.Fprint(w, err.Error())
 		return
 	}
+	fmt.Println("payload", payload)
 
 	if len(payload.Messages) <= 0 {
 		w.WriteHeader(http.StatusOK)
@@ -102,17 +104,24 @@ func (h *WhatsappHandler) HandleIncomingRequestsWac(w http.ResponseWriter, r *ht
 	}
 
 	contact := h.getOrCreateContact(payload)
+	fmt.Println("contact", contact)
+
 	textMessage := h.getMessageText(payload)
+	fmt.Println("textMessage", textMessage)
 
 	// Handle token-based channel registration/update
 	if textMessage != "" && strings.Contains(textMessage, tokenPrefix) {
+		fmt.Println("handleTokenMessage")
 		h.handleTokenMessage(w, contact, textMessage, payload)
+		fmt.Println("handleTokenMessage done")
 		return
 	}
 
 	// Handle regular message routing
 	if contact != nil {
+		fmt.Println("routeMessageWac")
 		h.routeMessageWac(w, contact, incomingWebhookEvent)
+		fmt.Println("routeMessageWac done")
 		return
 	}
 
