@@ -110,3 +110,19 @@ func (mr *MockWhatsappServiceMockRecorder) SendMessage(arg0 interface{}) *gomock
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendMessage", reflect.TypeOf((*MockWhatsappService)(nil).SendMessage), arg0)
 }
+
+// SendMessageWac mocks base method.
+func (m *MockWhatsappService) SendMessageWac(arg0 []byte) (http.Header, io.ReadCloser, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SendMessageWac", arg0)
+	ret0, _ := ret[0].(http.Header)
+	ret1, _ := ret[1].(io.ReadCloser)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// SendMessageWac indicates an expected call of SendMessageWac.
+func (mr *MockWhatsappServiceMockRecorder) SendMessageWac(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendMessageWac", reflect.TypeOf((*MockWhatsappService)(nil).SendMessageWac), arg0)
+}

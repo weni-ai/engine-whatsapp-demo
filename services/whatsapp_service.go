@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 
@@ -22,6 +21,7 @@ const (
 
 type WhatsappService interface {
 	SendMessage([]byte) (http.Header, io.ReadCloser, error)
+	SendMessageWac([]byte) (http.Header, io.ReadCloser, error)
 	Login() (*http.Response, error)
 	Health() (*http.Response, error)
 	GetMedia(http.Header, string) (*http.Response, error)
@@ -49,7 +49,39 @@ func (ws DefaultWhatsappService) SendMessage(body []byte) (http.Header, io.ReadC
 			"Accept":        {"application/json"},
 			"Authorization": {"Bearer " + config.GetAuthToken()},
 		},
-		Body: ioutil.NopCloser(bytes.NewReader(body)),
+		Body: io.NopCloser(bytes.NewReader(body)),
+	}
+
+	res, err := httpClient.Do(req)
+
+	if err != nil {
+		return nil, nil, err
+	}
+	if res.StatusCode == 401 {
+		return nil, nil, errors.New(res.Status)
+	}
+
+	return res.Header, res.Body, nil
+}
+
+func (ws DefaultWhatsappService) SendMessageWac(body []byte) (http.Header, io.ReadCloser, error) {
+	wconfig := config.GetConfig().WhatsappCloud
+
+	httpClient := utils.GetHTTPClient()
+
+	base, _ := url.Parse(wconfig.BaseURL)
+	path, _ := url.Parse(fmt.Sprintf("/%s/messages", wconfig.Address))
+	wacPhoneURL := base.ResolveReference(path)
+
+	req := &http.Request{
+		Method: "POST",
+		URL:    wacPhoneURL,
+		Header: map[string][]string{
+			"Content-Type":  {"application/json"},
+			"Accept":        {"application/json"},
+			"Authorization": {"Bearer " + wconfig.Token},
+		},
+		Body: io.NopCloser(bytes.NewReader(body)),
 	}
 
 	res, err := httpClient.Do(req)

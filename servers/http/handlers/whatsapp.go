@@ -88,7 +88,7 @@ func (h *WhatsappHandler) HandleIncomingRequestsWac(w http.ResponseWriter, r *ht
 		return
 	}
 
-	payload, err := h.parseEventPayload(incomingWebhookEvent)
+	payload, err := h.parseEventPayloadWac(incomingWebhookEvent)
 	if err != nil {
 		logger.Error(fmt.Sprintf("unable to parse request body: %s", err))
 		w.WriteHeader(http.StatusOK)
@@ -96,17 +96,18 @@ func (h *WhatsappHandler) HandleIncomingRequestsWac(w http.ResponseWriter, r *ht
 		return
 	}
 
-	if len(payload.Messages) <= 0 {
+	if len(payload.Entry[0].Changes[0].Value.Messages) <= 0 {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
 
-	contact := h.getOrCreateContact(payload)
-	textMessage := h.getMessageText(payload)
+	contact := h.getOrCreateContactWac(payload)
+
+	textMessage := h.getMessageTextWac(payload)
 
 	// Handle token-based channel registration/update
 	if textMessage != "" && strings.Contains(textMessage, tokenPrefix) {
-		h.handleTokenMessage(w, contact, textMessage, payload)
+		h.handleTokenMessageWac(w, contact, textMessage, payload)
 		return
 	}
 
@@ -132,6 +133,14 @@ func (h *WhatsappHandler) parseEventPayload(data []byte) (*eventPayload, error) 
 	return payload, nil
 }
 
+func (h *WhatsappHandler) parseEventPayloadWac(data []byte) (*eventPayloadWac, error) {
+	payload := &eventPayloadWac{}
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return nil, err
+	}
+	return payload, nil
+}
+
 func (h *WhatsappHandler) getOrCreateContact(payload *eventPayload) *models.Contact {
 	cName := ""
 	if len(payload.Contacts) > 0 {
@@ -150,9 +159,34 @@ func (h *WhatsappHandler) getOrCreateContact(payload *eventPayload) *models.Cont
 	return contact
 }
 
+func (h *WhatsappHandler) getOrCreateContactWac(payload *eventPayloadWac) *models.Contact {
+	cName := ""
+	if len(payload.Entry[0].Changes[0].Value.Contacts) > 0 {
+		cName = payload.Entry[0].Changes[0].Value.Contacts[0].Profile.Name
+	}
+	incomingContact := &models.Contact{
+		URN:  payload.Entry[0].Changes[0].Value.Contacts[0].WaID,
+		Name: cName,
+	}
+
+	contact, err := h.ContactService.FindContact(incomingContact)
+	if err != nil {
+		logger.Debug(err.Error())
+	}
+
+	return contact
+}
+
 func (h *WhatsappHandler) getMessageText(payload *eventPayload) string {
 	if payload.Messages[0].Type == "text" {
 		return payload.Messages[0].Text.Body
+	}
+	return ""
+}
+
+func (h *WhatsappHandler) getMessageTextWac(payload *eventPayloadWac) string {
+	if payload.Entry[0].Changes[0].Value.Messages[0].Type == "text" {
+		return payload.Entry[0].Changes[0].Value.Messages[0].Text.Body
 	}
 	return ""
 }
@@ -187,6 +221,39 @@ func (h *WhatsappHandler) handleTokenMessage(w http.ResponseWriter, contact *mod
 		}
 
 		h.createNewContact(w, incomingContact, channelFromToken)
+	}
+}
+
+func (h *WhatsappHandler) handleTokenMessageWac(w http.ResponseWriter, contact *models.Contact, token string, payload *eventPayloadWac) {
+	channelFromToken, err := h.ChannelService.FindChannelByToken(token)
+	if err != nil {
+		logger.Debug(err.Error())
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if channelFromToken == nil {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	// Create a new contact or update existing one
+	if contact != nil {
+		h.updateExistingContactWac(w, contact, channelFromToken)
+	} else {
+		// Create contact from payload
+		cName := ""
+		if len(payload.Entry[0].Changes[0].Value.Contacts) > 0 {
+			cName = payload.Entry[0].Changes[0].Value.Contacts[0].Profile.Name
+		}
+
+		incomingContact := &models.Contact{
+			URN:     payload.Entry[0].Changes[0].Value.Messages[0].From,
+			Name:    cName,
+			Channel: channelFromToken.ID,
+		}
+
+		h.createNewContactWac(w, incomingContact, channelFromToken)
 	}
 }
 
@@ -227,6 +294,43 @@ func (h *WhatsappHandler) updateExistingContact(w http.ResponseWriter, contact *
 	h.Metrics.SaveContactActivation(contactActivation)
 }
 
+func (h *WhatsappHandler) updateExistingContactWac(w http.ResponseWriter, contact *models.Contact, newChannel *models.Channel) {
+	lastContactChannel, err := h.ChannelService.FindChannelById(contact.Channel.Hex())
+	if err != nil {
+		logger.Error(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	contact.Channel = newChannel.ID
+	_, err = h.ContactService.UpdateContact(contact)
+	if err != nil {
+		logger.Error(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	_, b, err := h.sendTokenConfirmationWac(contact)
+	if err != nil {
+		logger.Error(err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	body, _ := ioutil.ReadAll(b)
+	b.Close()
+	logger.Debug(string(body))
+	w.WriteHeader(http.StatusOK)
+
+	// Update metrics
+	contactActivatedMetricDec := metric.NewContactActivated(lastContactChannel.UUID)
+	h.Metrics.DecContactActivated(contactActivatedMetricDec)
+	contactActivatedMetricInc := metric.NewContactActivated(newChannel.UUID)
+	h.Metrics.IncContactActivated(contactActivatedMetricInc)
+	contactActivation := metric.NewContactActivation(newChannel.UUID)
+	h.Metrics.SaveContactActivation(contactActivation)
+}
+
 func (h *WhatsappHandler) createNewContact(w http.ResponseWriter, contact *models.Contact, channel *models.Channel) {
 	_, err := h.ContactService.CreateContact(contact)
 	if err != nil {
@@ -236,6 +340,33 @@ func (h *WhatsappHandler) createNewContact(w http.ResponseWriter, contact *model
 	}
 
 	_, b, err := h.sendTokenConfirmation(contact)
+	if err != nil {
+		logger.Error(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	body, _ := ioutil.ReadAll(b)
+	b.Close()
+	logger.Debug(string(body))
+	w.WriteHeader(http.StatusOK)
+
+	// Update metrics
+	contactActivation := metric.NewContactActivation(channel.UUID)
+	h.Metrics.SaveContactActivation(contactActivation)
+	contactActivated := metric.NewContactActivated(channel.UUID)
+	h.Metrics.IncContactActivated(contactActivated)
+}
+
+func (h *WhatsappHandler) createNewContactWac(w http.ResponseWriter, contact *models.Contact, channel *models.Channel) {
+	_, err := h.ContactService.CreateContact(contact)
+	if err != nil {
+		logger.Error(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	_, b, err := h.sendTokenConfirmationWac(contact)
 	if err != nil {
 		logger.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -420,6 +551,18 @@ func (h *WhatsappHandler) sendTokenConfirmation(contact *models.Contact) (http.H
 	return h.WhatsappService.SendMessage(payloadBytes)
 }
 
+func (h *WhatsappHandler) sendTokenConfirmationWac(contact *models.Contact) (http.Header, io.ReadCloser, error) {
+	urn := contact.URN
+	payload := fmt.Sprintf(
+		`{"messaging_product":"whatsapp","recipient_type":"individual","to":"%s","type":"text","text":{"body":"%s"}}`,
+		urn,
+		confirmationMessage,
+	)
+	payloadBytes := []byte(payload)
+
+	return h.WhatsappService.SendMessageWac(payloadBytes)
+}
+
 type eventPayload struct {
 	Contacts []struct {
 		Profile struct {
@@ -436,4 +579,36 @@ type eventPayload struct {
 			Body string `json:"body"`
 		} `json:"text"`
 	}
+}
+
+type eventPayloadWac struct {
+	Object string `json:"object"`
+	Entry  []struct {
+		ID      string `json:"id"`
+		Changes []struct {
+			Value struct {
+				MessagingProduct string `json:"messaging_product"`
+				Metadata         struct {
+					DisplayPhoneNumber string `json:"display_phone_number"`
+					PhoneNumberID      string `json:"phone_number_id"`
+				} `json:"metadata"`
+				Contacts []struct {
+					Profile struct {
+						Name string `json:"name"`
+					} `json:"profile"`
+					WaID string `json:"wa_id"`
+				} `json:"contacts"`
+				Messages []struct {
+					From      string `json:"from"      validate:"required"`
+					ID        string `json:"id"        validate:"required"`
+					Timestamp string `json:"timestamp" validate:"required"`
+					Type      string `json:"type"      validate:"required"`
+					Text      struct {
+						Body string `json:"body"`
+					} `json:"text"`
+				} `json:"messages"`
+			} `json:"value"`
+			Field string `json:"field"`
+		} `json:"changes"`
+	} `json:"entry"`
 }

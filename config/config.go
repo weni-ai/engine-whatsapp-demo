@@ -11,10 +11,11 @@ import (
 )
 
 type Config struct {
-	App      App
-	DB       DB
-	Whatsapp Whatsapp
-	OIDC     OIDC
+	App           App
+	DB            DB
+	Whatsapp      Whatsapp
+	WhatsappCloud WhatsappCloud
+	OIDC          OIDC
 }
 
 type App struct {
@@ -36,6 +37,12 @@ type Whatsapp struct {
 	Username       string `env:"WPP_USERNAME,required"`
 	Password       string `env:"WPP_PASSWORD,required"`
 	WelcomeMessage string `env:"WPP_CONFIRMATION_MESSAGE,default=Olá, bem vindo ao WhatsApp Demo, para iniciar um fluxo de mensagens envie a *palavra chave* do fluxo que deseja iniciar 👀"`
+}
+
+type WhatsappCloud struct {
+	BaseURL string `env:"WPP_CLOUD_BASE_URL,required"`
+	Token   string `env:"WPP_CLOUD_TOKEN,required"`
+	Address string `env:"WPP_CLOUD_ADDRESS,required"`
 }
 
 type OIDC struct {
