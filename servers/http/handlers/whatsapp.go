@@ -80,6 +80,7 @@ func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.
 func (h *WhatsappHandler) HandleIncomingRequestsWac(w http.ResponseWriter, r *http.Request) {
 	incomingWebhookEvent, err := ioutil.ReadAll(io.LimitReader(r.Body, 1000000))
 	r.Body = ioutil.NopCloser(bytes.NewBuffer(incomingWebhookEvent))
+	fmt.Println("incomingRequestWac", r.Body)
 	defer r.Body.Close()
 	if err != nil {
 		logger.Error(fmt.Sprintf("unable to read request body: %s", err))
