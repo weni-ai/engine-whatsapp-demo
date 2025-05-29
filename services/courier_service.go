@@ -11,7 +11,7 @@ import (
 
 type CourierService interface {
 	RedirectMessage(string, string) (int, error)
-	RedirectMessageWac(string, *http.Request) (int, error)
+	RedirectMessageWac(string, *http.Request, string) (int, error)
 }
 
 type DefaultCourierService struct {
@@ -32,10 +32,12 @@ func (cs DefaultCourierService) RedirectMessage(channelUUID string, msg string) 
 	return resp.StatusCode, nil
 }
 
-func (cs DefaultCourierService) RedirectMessageWac(channelUUID string, r *http.Request) (int, error) {
+func (cs DefaultCourierService) RedirectMessageWac(channelUUID string, r *http.Request, token string) (int, error) {
 	courierBaseURL := config.GetConfig().App.CloudURL
 	// url := fmt.Sprintf("%v/%v/receive", courierBaseURL, channelUUID)
 	url := fmt.Sprintf("%v/receive", courierBaseURL)
+
+	fmt.Println("URL", url)
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -46,7 +48,14 @@ func (cs DefaultCourierService) RedirectMessageWac(channelUUID string, r *http.R
 	if err != nil {
 		return 0, err
 	}
-	req.Header = r.Header
+
+	for key, values := range r.Header {
+		for _, value := range values {
+			req.Header.Add(key, value)
+		}
+	}
+
+	req.Header.Add("X-Router-Token", token)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
