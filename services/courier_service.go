@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/weni/whatsapp-router/config"
+	"github.com/weni/whatsapp-router/logger"
 )
 
 type CourierService interface {
@@ -64,9 +65,11 @@ func (cs DefaultCourierService) RedirectMessageWac(channelUUID string, r *http.R
 	}
 
 	body, _ = io.ReadAll(resp.Body)
-
 	log.Println("Status Code:", resp.StatusCode)
 	log.Println("Body:", string(body))
+	log.Printf("Response: %v, Body: %v, Response Body: %v", resp, string(body), body)
+	logger.Error(fmt.Sprintf("Response: %v, Body: %v, Response Body: %v", resp, string(body), body))
+	resp.Body.Close()
 
 	return resp.StatusCode, nil
 }
