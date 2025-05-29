@@ -436,7 +436,7 @@ func (h *WhatsappHandler) routeMessageWac(w http.ResponseWriter, r *http.Request
 	}
 
 	channelUUID := channel.UUID
-	status, err := h.CourierService.RedirectMessageWac(channelUUID, r)
+	status, err := h.CourierService.RedirectMessageWac(channelUUID, r, channel.Token)
 	if err != nil {
 		logger.Debug(err.Error())
 		w.WriteHeader(status)
