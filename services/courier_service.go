@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 
 	"github.com/weni/whatsapp-router/config"
@@ -61,6 +62,11 @@ func (cs DefaultCourierService) RedirectMessageWac(channelUUID string, r *http.R
 	if err != nil {
 		return resp.StatusCode, err
 	}
+
+	body, _ = io.ReadAll(resp.Body)
+
+	log.Println("Status Code:", resp.StatusCode)
+	log.Println("Body:", string(body))
 
 	return resp.StatusCode, nil
 }
