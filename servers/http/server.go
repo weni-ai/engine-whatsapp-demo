@@ -84,6 +84,13 @@ func NewRouter(s *Server) *chi.Mux {
 		})
 	})
 
+	router.Route("/wacr/", func(r chi.Router) {
+		r.Use(ContentTypeJson)
+		r.Route("/receive", func(r chi.Router) {
+			r.Post("/", whatsappHandler.HandleIncomingRequestsWac)
+		})
+	})
+
 	router.Route("/v1", func(r chi.Router) {
 		r.Post("/messages", courierHandler.HandleSendMessage)
 		r.Post("/users/login", whatsappHandler.RefreshToken)
@@ -96,6 +103,7 @@ func NewRouter(s *Server) *chi.Mux {
 	})
 
 	router.Post("/integrations/channel", handlers.KeycloackAuth(integrationsHandler.HandleCreateChannel))
+	router.Post("/integrations/channel/create", integrationsHandler.HandleCreateChannel)
 
 	router.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)

@@ -11,16 +11,18 @@ import (
 )
 
 type Config struct {
-	App      App
-	DB       DB
-	Whatsapp Whatsapp
-	OIDC     OIDC
+	App           App
+	DB            DB
+	Whatsapp      Whatsapp
+	WhatsappCloud WhatsappCloud
+	OIDC          OIDC
 }
 
 type App struct {
 	HttpPort       int32  `env:"APP_HTTP_PORT,default=9000"`
 	GRPCPort       int32  `env:"APP_GRPC_PORT,default=7000"`
 	CourierBaseURL string `env:"APP_COURIER_BASE_URL,default=http://localhost:8000/c/wa"`
+	CloudURL       string `env:"APP_WPP_CLOUD_URL,default=http://localhost:8000/c/wcd"`
 	SentryDSN      string `env:"APP_SENTRY_DSN"`
 	LogLevel       string `env:"APP_LOG_LEVEL,default=debug"`
 }
@@ -35,6 +37,12 @@ type Whatsapp struct {
 	Username       string `env:"WPP_USERNAME,required"`
 	Password       string `env:"WPP_PASSWORD,required"`
 	WelcomeMessage string `env:"WPP_CONFIRMATION_MESSAGE,default=Olá, bem vindo ao WhatsApp Demo, para iniciar um fluxo de mensagens envie a *palavra chave* do fluxo que deseja iniciar 👀"`
+}
+
+type WhatsappCloud struct {
+	BaseURL string `env:"WPP_CLOUD_BASE_URL,required"`
+	Token   string `env:"WPP_CLOUD_TOKEN,required"`
+	Address string `env:"WPP_CLOUD_ADDRESS,required"`
 }
 
 type OIDC struct {
