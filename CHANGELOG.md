@@ -1,3 +1,7 @@
+v1.3.0
+---------- 
+ * Whatsapp Cloud Demo 
+
 v1.2.3
 ---------- 
  * Fix bug of downloading files in WhatsApp Demo channels #24
