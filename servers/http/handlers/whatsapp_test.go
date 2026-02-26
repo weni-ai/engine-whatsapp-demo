@@ -2,8 +2,8 @@ package handlers
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -18,6 +18,31 @@ import (
 	"github.com/weni/whatsapp-router/models"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
+
+// welcomePayloadMatcher verifies that the payload is JSON with expected "to" and "text.body".
+type welcomePayloadMatcher struct {
+	expectedTo   string
+	expectedBody string
+}
+
+func (m *welcomePayloadMatcher) Matches(x interface{}) bool {
+	body, ok := x.([]byte)
+	if !ok {
+		return false
+	}
+	var payload map[string]interface{}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return false
+	}
+	to, _ := payload["to"].(string)
+	text, _ := payload["text"].(map[string]interface{})
+	msgBody, _ := text["body"].(string)
+	return to == m.expectedTo && msgBody == m.expectedBody
+}
+
+func (m *welcomePayloadMatcher) String() string {
+	return "welcome payload with to=" + m.expectedTo + " and expected body"
+}
 
 var testCases = []struct {
 	Label  string
@@ -65,11 +90,8 @@ func TestContactTokenConfirmation(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	payload := fmt.Sprintf(
-		`{"to":"%s","type":"text","text":{"body":"%s"}}`,
-		dummyContact.URN,
-		confirmationMessage,
-	)
+	// When FlowsClient is nil, handler uses default welcome message (en)
+	defaultWelcomeMsg := "Hello, welcome to WhatsApp Demo. To start a message flow, send the *keyword* of the flow you want to start 👀"
 	incomingRequest := `{"contacts":[{"profile":{"name":"Dummy"},"wa_id":"12341341234"}],"messages":[{"from":"5582988887777","id":"123456","text":{"body":"weni-demo-44a2m17t0x"},"timestamp":"623123123123","type":"text"}]}`
 
 	metricService, err := metric.NewPrometheusService()
@@ -83,13 +105,24 @@ func TestContactTokenConfirmation(t *testing.T) {
 	mockChannelService.EXPECT().FindChannelByToken(dummyChannel.Token).Return(dummyChannel, nil)
 	mockContactService.EXPECT().FindContact(incomingDummyContact).Return(nil, errors.New("contact not found"))
 	mockContactService.EXPECT().CreateContact(dummyContact).Return(dummyContact, nil)
-	mockWhatsappService.EXPECT().SendMessage([]byte(payload)).Return(
+	mockWhatsappService.EXPECT().SendMessage(&welcomePayloadMatcher{
+		expectedTo:   dummyContact.URN,
+		expectedBody: defaultWelcomeMsg,
+	}).Return(
 		http.Header{"content-type": {"application/json"}},
 		io.NopCloser(bytes.NewReader([]byte(`{"messages":{"id":"gBEGVYKZRIIyAgmiTgezkroUL2Q"}],"meta":{"api_status":"stable","version":"2.35.2"}}`))),
 		nil,
 	)
 
-	wh := WhatsappHandler{mockContactService, mockChannelService, mockCourierService, mockWhatsappService, mockConfigService, metricService}
+	wh := WhatsappHandler{
+		ContactService:  mockContactService,
+		ChannelService:  mockChannelService,
+		CourierService:  mockCourierService,
+		WhatsappService: mockWhatsappService,
+		ConfigService:   mockConfigService,
+		Metrics:         metricService,
+		FlowsClient:     nil,
+	}
 	router := chi.NewRouter()
 	router.Post("/wr/receive/", wh.HandleIncomingRequests)
 	request, _ := http.NewRequest(
@@ -118,7 +151,15 @@ func TestHandleIncomingRequest(t *testing.T) {
 			mockChannelService.EXPECT().FindChannelById(channelID.Hex()).Return(dummyChannel, nil)
 			mockCourierService.EXPECT().RedirectMessage(dummyChannel.UUID, tc.Data).Return(tc.Status, nil)
 
-			wh := WhatsappHandler{mockContactService, mockChannelService, mockCourierService, mockWhatsappService, mockConfigService, metricService}
+			wh := WhatsappHandler{
+				ContactService:  mockContactService,
+				ChannelService:  mockChannelService,
+				CourierService:  mockCourierService,
+				WhatsappService: mockWhatsappService,
+				ConfigService:   mockConfigService,
+				Metrics:         metricService,
+				FlowsClient:     nil,
+			}
 			router := chi.NewRouter()
 			router.Post("/wr/receive/", wh.HandleIncomingRequests)
 			request, _ := http.NewRequest(
@@ -153,18 +194,17 @@ func TestContactTokenUpdate(t *testing.T) {
 		Channel: dummyChannel2.ID,
 	}
 
-	payload := fmt.Sprintf(
-		`{"to":"%s","type":"text","text":{"body":"%s"}}`,
-		dummyContact.URN,
-		confirmationMessage,
-	)
+	defaultWelcomeMsg := "Hello, welcome to WhatsApp Demo. To start a message flow, send the *keyword* of the flow you want to start 👀"
 
 	incomingRequest := `{"contacts":[{"profile":{"name":"Dummy"},"wa_id":"12341341234"}],"messages":[{"from":"5582988887777","id":"123456","text":{"body":"weni-demo-1234567890"},"timestamp":"623123123123","type":"text"}]}`
 	mockContactService.EXPECT().FindContact(incomingDummyContact).Return(dummyContact, nil)
 	mockChannelService.EXPECT().FindChannelById(dummyContact.Channel.Hex()).Return(dummyChannel, nil)
 	mockContactService.EXPECT().UpdateContact(dummyContact).Return(dummyUpdatedContact, nil)
 	mockChannelService.EXPECT().FindChannelByToken(dummyChannel2.Token).Return(dummyChannel2, nil)
-	mockWhatsappService.EXPECT().SendMessage([]byte(payload)).Return(
+	mockWhatsappService.EXPECT().SendMessage(&welcomePayloadMatcher{
+		expectedTo:   dummyContact.URN,
+		expectedBody: defaultWelcomeMsg,
+	}).Return(
 		http.Header{
 			"content-type": {"application/json"},
 		},
@@ -172,7 +212,15 @@ func TestContactTokenUpdate(t *testing.T) {
 		nil,
 	)
 
-	wh := WhatsappHandler{mockContactService, mockChannelService, mockCourierService, mockWhatsappService, mockConfigService, metricService}
+	wh := WhatsappHandler{
+		ContactService:  mockContactService,
+		ChannelService:  mockChannelService,
+		CourierService:  mockCourierService,
+		WhatsappService: mockWhatsappService,
+		ConfigService:   mockConfigService,
+		Metrics:         metricService,
+		FlowsClient:     nil,
+	}
 	router := chi.NewRouter()
 	router.Post("/wr/receive/", wh.HandleIncomingRequests)
 	request, _ := http.NewRequest(
@@ -214,7 +262,15 @@ func TestRefreshToken(t *testing.T) {
 		conf,
 	).Return(conf, nil)
 
-	wh := WhatsappHandler{mockContactService, mockChannelService, mockCourierService, mockWhatsappService, mockConfigService, metricService}
+	wh := WhatsappHandler{
+		ContactService:  mockContactService,
+		ChannelService:  mockChannelService,
+		CourierService:  mockCourierService,
+		WhatsappService: mockWhatsappService,
+		ConfigService:   mockConfigService,
+		Metrics:         metricService,
+		FlowsClient:     nil,
+	}
 	router := chi.NewRouter()
 	testRoute := "/v1/users/login"
 	router.Post(testRoute, wh.RefreshToken)

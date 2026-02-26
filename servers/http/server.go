@@ -2,6 +2,7 @@ package http
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"time"
@@ -11,6 +12,8 @@ import (
 	"github.com/weni/whatsapp-router/config"
 	"github.com/weni/whatsapp-router/logger"
 	"github.com/weni/whatsapp-router/metric"
+	"github.com/weni/whatsapp-router/pkg/flows"
+	"github.com/weni/whatsapp-router/pkg/jwt"
 	"github.com/weni/whatsapp-router/repositories"
 	"github.com/weni/whatsapp-router/servers/http/handlers"
 	"github.com/weni/whatsapp-router/services"
@@ -60,6 +63,21 @@ func NewRouter(s *Server) *chi.Mux {
 	contactRepoDb := repositories.NewContactRepositoryDb(s.db)
 	channelRepoDb := repositories.NewChannelRepositoryDb(s.db)
 	configRepoDb := repositories.NewConfigRepository(s.db)
+
+	var flowsClient *flows.Client
+	jwtConf := s.config.JWT
+	if jwtConf.PrivateKey != "" {
+		signer, err := jwt.NewSigner(jwtConf.PrivateKey, jwtConf.ExpirationMins)
+		if err != nil {
+			log.Fatalf("failed to initialize JWT signer: %v", err)
+		}
+		flowsClient = flows.NewClient(s.config.Flows.URL, signer)
+		logger.Info("JWT signer and Flows client initialized for project language")
+	} else {
+		flowsClient = flows.NewClient(s.config.Flows.URL, nil)
+		logger.Info("Flows client initialized without JWT (project language may require auth)")
+	}
+
 	whatsappHandler := handlers.WhatsappHandler{
 		ContactService:  services.NewContactService(contactRepoDb),
 		ChannelService:  services.NewChannelService(channelRepoDb, s.metrics),
@@ -67,6 +85,7 @@ func NewRouter(s *Server) *chi.Mux {
 		WhatsappService: services.NewWhatsappService(),
 		ConfigService:   services.NewConfigService(configRepoDb),
 		Metrics:         s.metrics,
+		FlowsClient:     flowsClient,
 	}
 	courierHandler := handlers.CourierHandler{
 		WhatsappService: services.NewWhatsappService(),

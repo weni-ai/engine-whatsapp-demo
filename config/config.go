@@ -16,6 +16,17 @@ type Config struct {
 	Whatsapp      Whatsapp
 	WhatsappCloud WhatsappCloud
 	OIDC          OIDC
+	Flows         Flows
+	JWT           JWT
+}
+
+type Flows struct {
+	URL string `env:"FLOWS_URL,default=https://flows.weni.ai"`
+}
+
+type JWT struct {
+	PrivateKey     string `env:"JWT_PRIVATE_KEY"`
+	ExpirationMins int64  `env:"JWT_EXPIRATION_MINS,default=60"`
 }
 
 type App struct {
