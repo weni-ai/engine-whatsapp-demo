@@ -22,22 +22,23 @@ import (
 
 const tokenPrefix = "weni-demo"
 
-// Welcome messages by project language. Default (en) is used when language is unknown or API fails.
+// Welcome messages by project language. Default (en-us) is used when language is unknown or API fails.
 var welcomeMessages = map[string]string{
-	"en-us": "Welcome! Send a message to talk to our agent :wave:",
-	"es":    "¡Bienvenido! Envía un mensaje para hablar con nuestro agente :wave:",
-	"pt-br": "Bem-vindo! Envie uma mensagem para falar com nosso agente :wave:",
+	"en":    "Welcome! Send a message to talk to our *agent* :wave:",
+	"en-us": "Welcome! Send a message to talk to our *agent* :wave:",
+	"es":    "¡Bienvenido! Envía un mensaje para hablar con nuestro *agente* :wave:",
+	"pt-br": "Bem-vindo! Envie uma mensagem para falar com nosso *agente* :wave:",
 }
 
 func getWelcomeMessage(lang string) string {
 	if lang == "" {
-		return welcomeMessages["en"]
+		return welcomeMessages["en-us"]
 	}
 	key := strings.ToLower(strings.TrimSpace(lang))
 	if msg, ok := welcomeMessages[key]; ok {
 		return msg
 	}
-	return welcomeMessages["en"]
+	return welcomeMessages["en-us"]
 }
 
 type WhatsappHandler struct {
@@ -561,15 +562,15 @@ func (h *WhatsappHandler) HandlePostMedia(w http.ResponseWriter, r *http.Request
 	res.Body.Close()
 }
 
-// welcomeMessageForChannel returns the welcome message for the channel's project language (en, es, pt-BR; default en).
+// welcomeMessageForChannel returns the welcome message for the channel's project language (en-us, es, pt-BR; default en-us).
 func (h *WhatsappHandler) welcomeMessageForChannel(channel *models.Channel) string {
 	if h.FlowsClient == nil {
-		return getWelcomeMessage("en")
+		return getWelcomeMessage("en-us")
 	}
 	lang, err := h.FlowsClient.GetProjectLanguage(channel.UUID)
 	if err != nil {
 		logger.Debug(fmt.Sprintf("could not get project language for channel %s: %v, using default", channel.UUID, err))
-		return getWelcomeMessage("en")
+		return getWelcomeMessage("en-us")
 	}
 	return getWelcomeMessage(lang)
 }
