@@ -24,10 +24,10 @@ const tokenPrefix = "weni-demo"
 
 // Welcome messages by project language. Default (en-us) is used when language is unknown or API fails.
 var welcomeMessages = map[string]string{
-	"en":    "Welcome! Send a message to talk to our *agent* :wave:",
-	"en-us": "Welcome! Send a message to talk to our *agent* :wave:",
-	"es":    "¡Bienvenido! Envía un mensaje para hablar con nuestro *agente* :wave:",
-	"pt-br": "Bem-vindo! Envie uma mensagem para falar com nosso *agente* :wave:",
+	"en":    "Welcome! Send a message to talk to our *agent* 👋",
+	"en-us": "Welcome! Send a message to talk to our *agent* 👋",
+	"es":    "¡Bienvenido! Envía un mensaje para hablar con nuestro *agente* 👋",
+	"pt-br": "Bem-vindo! Envie uma mensagem para falar com nosso *agente* 👋",
 }
 
 func getWelcomeMessage(lang string) string {
