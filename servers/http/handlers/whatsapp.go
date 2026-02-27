@@ -565,13 +565,16 @@ func (h *WhatsappHandler) HandlePostMedia(w http.ResponseWriter, r *http.Request
 // welcomeMessageForChannel returns the welcome message for the channel's project language (en-us, es, pt-BR; default en-us).
 func (h *WhatsappHandler) welcomeMessageForChannel(channel *models.Channel) string {
 	if h.FlowsClient == nil {
+		logger.Info("[welcome] FlowsClient is nil, skipping project language fetch, using default en-us")
 		return getWelcomeMessage("en-us")
 	}
+	logger.Info(fmt.Sprintf("[welcome] fetching project language for channel_uuid=%s", channel.UUID))
 	lang, err := h.FlowsClient.GetProjectLanguage(channel.UUID)
 	if err != nil {
 		logger.Debug(fmt.Sprintf("could not get project language for channel %s: %v, using default", channel.UUID, err))
 		return getWelcomeMessage("en-us")
 	}
+	logger.Info(fmt.Sprintf("[welcome] project language for channel %s: %s", channel.UUID, lang))
 	return getWelcomeMessage(lang)
 }
 
