@@ -1,3 +1,7 @@
+v1.4.0
+---------- 
+ * feat: Updated WhatsappHandler to utilize Flows client for dynamic welcome messages based on project language
+
 v1.3.0
 ---------- 
  * Whatsapp Cloud Demo 
