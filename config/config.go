@@ -44,16 +44,16 @@ type DB struct {
 }
 
 type Whatsapp struct {
-	BaseURL        string `env:"WPP_BASEURL,required"`
-	Username       string `env:"WPP_USERNAME,required"`
-	Password       string `env:"WPP_PASSWORD,required"`
+	BaseURL        string `env:"WPP_BASEURL,default=http://localhost"`
+	Username       string `env:"WPP_USERNAME,default=test"`
+	Password       string `env:"WPP_PASSWORD,default=test"`
 	WelcomeMessage string `env:"WPP_CONFIRMATION_MESSAGE,default=Olá, bem vindo ao WhatsApp Demo, para iniciar um fluxo de mensagens envie a *palavra chave* do fluxo que deseja iniciar 👀"`
 }
 
 type WhatsappCloud struct {
-	BaseURL string `env:"WPP_CLOUD_BASE_URL,required"`
-	Token   string `env:"WPP_CLOUD_TOKEN,required"`
-	Address string `env:"WPP_CLOUD_ADDRESS,required"`
+	BaseURL string `env:"WPP_CLOUD_BASE_URL,default=http://localhost/cloud"`
+	Token   string `env:"WPP_CLOUD_TOKEN,default=test-token"`
+	Address string `env:"WPP_CLOUD_ADDRESS,default=test-address"`
 }
 
 type OIDC struct {

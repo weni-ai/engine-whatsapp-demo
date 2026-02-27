@@ -91,8 +91,8 @@ func TestContactTokenConfirmation(t *testing.T) {
 	defer ctrl.Finish()
 
 	// When FlowsClient is nil, handler uses default welcome message (en)
-	// Default (en-us) when FlowsClient is nil
-	defaultWelcomeMsg := "Welcome! Send a message to talk to our `agent` :wave:"
+	// Default (en-us) when FlowsClient is nil - must match welcomeMessages["en-us"] in whatsapp.go
+	defaultWelcomeMsg := "Welcome! Send a message to talk to our *agent* 👋"
 	incomingRequest := `{"contacts":[{"profile":{"name":"Dummy"},"wa_id":"12341341234"}],"messages":[{"from":"5582988887777","id":"123456","text":{"body":"weni-demo-44a2m17t0x"},"timestamp":"623123123123","type":"text"}]}`
 
 	metricService, err := metric.NewPrometheusService()
@@ -195,8 +195,8 @@ func TestContactTokenUpdate(t *testing.T) {
 		Channel: dummyChannel2.ID,
 	}
 
-	// Default (en-us) when FlowsClient is nil
-	defaultWelcomeMsg := "Welcome! Send a message to talk to our `agent` :wave:"
+	// Default (en-us) when FlowsClient is nil - must match welcomeMessages["en-us"] in whatsapp.go
+	defaultWelcomeMsg := "Welcome! Send a message to talk to our *agent* 👋"
 
 	incomingRequest := `{"contacts":[{"profile":{"name":"Dummy"},"wa_id":"12341341234"}],"messages":[{"from":"5582988887777","id":"123456","text":{"body":"weni-demo-1234567890"},"timestamp":"623123123123","type":"text"}]}`
 	mockContactService.EXPECT().FindContact(incomingDummyContact).Return(dummyContact, nil)
