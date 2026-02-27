@@ -15,13 +15,31 @@ import (
 	"github.com/weni/whatsapp-router/logger"
 	"github.com/weni/whatsapp-router/metric"
 	"github.com/weni/whatsapp-router/models"
+	"github.com/weni/whatsapp-router/pkg/flows"
 	"github.com/weni/whatsapp-router/services"
 	"github.com/weni/whatsapp-router/utils"
 )
 
-var confirmationMessage = config.GetConfig().Whatsapp.WelcomeMessage
-
 const tokenPrefix = "weni-demo"
+
+// Welcome messages by project language. Default (en-us) is used when language is unknown or API fails.
+var welcomeMessages = map[string]string{
+	"en":    "Welcome! Send a message to talk to our *agent* 👋",
+	"en-us": "Welcome! Send a message to talk to our *agent* 👋",
+	"es":    "¡Bienvenido! Envía un mensaje para hablar con nuestro *agente* 👋",
+	"pt-br": "Bem-vindo! Envie uma mensagem para falar com nosso *agente* 👋",
+}
+
+func getWelcomeMessage(lang string) string {
+	if lang == "" {
+		return welcomeMessages["en-us"]
+	}
+	key := strings.ToLower(strings.TrimSpace(lang))
+	if msg, ok := welcomeMessages[key]; ok {
+		return msg
+	}
+	return welcomeMessages["en-us"]
+}
 
 type WhatsappHandler struct {
 	ContactService  services.ContactService
@@ -30,6 +48,7 @@ type WhatsappHandler struct {
 	WhatsappService services.WhatsappService
 	ConfigService   services.ConfigService
 	Metrics         *metric.Service
+	FlowsClient     flows.ProjectLanguageGetter
 }
 
 func (h *WhatsappHandler) HandleIncomingRequests(w http.ResponseWriter, r *http.Request) {
@@ -273,7 +292,8 @@ func (h *WhatsappHandler) updateExistingContact(w http.ResponseWriter, contact *
 		return
 	}
 
-	_, b, err := h.sendTokenConfirmation(contact)
+	welcomeMsg := h.welcomeMessageForChannel(newChannel)
+	_, b, err := h.sendTokenConfirmation(contact, welcomeMsg)
 	if err != nil {
 		logger.Error(err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
@@ -310,7 +330,8 @@ func (h *WhatsappHandler) updateExistingContactWac(w http.ResponseWriter, contac
 		return
 	}
 
-	_, b, err := h.sendTokenConfirmationWac(contact)
+	welcomeMsg := h.welcomeMessageForChannel(newChannel)
+	_, b, err := h.sendTokenConfirmationWac(contact, welcomeMsg)
 	if err != nil {
 		logger.Error(err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
@@ -339,7 +360,8 @@ func (h *WhatsappHandler) createNewContact(w http.ResponseWriter, contact *model
 		return
 	}
 
-	_, b, err := h.sendTokenConfirmation(contact)
+	welcomeMsg := h.welcomeMessageForChannel(channel)
+	_, b, err := h.sendTokenConfirmation(contact, welcomeMsg)
 	if err != nil {
 		logger.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -366,7 +388,8 @@ func (h *WhatsappHandler) createNewContactWac(w http.ResponseWriter, contact *mo
 		return
 	}
 
-	_, b, err := h.sendTokenConfirmationWac(contact)
+	welcomeMsg := h.welcomeMessageForChannel(channel)
+	_, b, err := h.sendTokenConfirmationWac(contact, welcomeMsg)
 	if err != nil {
 		logger.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -539,27 +562,44 @@ func (h *WhatsappHandler) HandlePostMedia(w http.ResponseWriter, r *http.Request
 	res.Body.Close()
 }
 
-func (h *WhatsappHandler) sendTokenConfirmation(contact *models.Contact) (http.Header, io.ReadCloser, error) {
-	urn := contact.URN
-	payload := fmt.Sprintf(
-		`{"to":"%s","type":"text","text":{"body":"%s"}}`,
-		urn,
-		confirmationMessage,
-	)
-	payloadBytes := []byte(payload)
+// welcomeMessageForChannel returns the welcome message for the channel's project language (en-us, es, pt-BR; default en-us).
+func (h *WhatsappHandler) welcomeMessageForChannel(channel *models.Channel) string {
+	if h.FlowsClient == nil {
+		return getWelcomeMessage("en-us")
+	}
+	lang, err := h.FlowsClient.GetProjectLanguage(channel.UUID)
+	if err != nil {
+		logger.Debug(fmt.Sprintf("could not get project language for channel %s: %v, using default", channel.UUID, err))
+		return getWelcomeMessage("en-us")
+	}
+	return getWelcomeMessage(lang)
+}
 
+func (h *WhatsappHandler) sendTokenConfirmation(contact *models.Contact, message string) (http.Header, io.ReadCloser, error) {
+	payload := map[string]interface{}{
+		"to":   contact.URN,
+		"type": "text",
+		"text": map[string]string{"body": message},
+	}
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		return nil, nil, err
+	}
 	return h.WhatsappService.SendMessage(payloadBytes)
 }
 
-func (h *WhatsappHandler) sendTokenConfirmationWac(contact *models.Contact) (http.Header, io.ReadCloser, error) {
-	urn := contact.URN
-	payload := fmt.Sprintf(
-		`{"messaging_product":"whatsapp","recipient_type":"individual","to":"%s","type":"text","text":{"body":"%s"}}`,
-		urn,
-		confirmationMessage,
-	)
-	payloadBytes := []byte(payload)
-
+func (h *WhatsappHandler) sendTokenConfirmationWac(contact *models.Contact, message string) (http.Header, io.ReadCloser, error) {
+	payload := map[string]interface{}{
+		"messaging_product": "whatsapp",
+		"recipient_type":    "individual",
+		"to":                contact.URN,
+		"type":              "text",
+		"text":              map[string]string{"body": message},
+	}
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		return nil, nil, err
+	}
 	return h.WhatsappService.SendMessageWac(payloadBytes)
 }
 

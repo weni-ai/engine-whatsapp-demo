@@ -1,4 +1,4 @@
-FROM golang:1.16.8-bullseye AS builder
+FROM golang:1.23-bullseye AS builder
 
 WORKDIR /src
 
